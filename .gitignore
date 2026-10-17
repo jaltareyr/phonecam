@@ -3,3 +3,7 @@ tools/
 certs/
 *.log
 release/
+native/virtual-camera/packages/
+native/virtual-camera/x64/
+native/virtual-camera/media-source/x64/
+native/virtual-camera/media-source/obj/

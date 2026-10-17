@@ -37,7 +37,7 @@ test('pairs two peers and relays signaling', async () => {
   try {
     let ready = false;
     for (let i = 0; i < 40; i++) {
-      try { ready = (await fetch(`${base}/health`)).ok; if (ready) break; } catch {}
+      try { const health = await (await fetch(`${base}/health`)).json(); ready = health.ok && health.app === 'phonecam'; if (ready) break; } catch {}
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     assert.equal(ready, true, 'server started');
@@ -62,6 +62,31 @@ test('pairs two peers and relays signaling', async () => {
     const offer = { type: 'offer', sdp: { type: 'offer', sdp: 'test' } };
     phone.send(JSON.stringify(offer));
     assert.deepEqual(await nextViewer(), offer);
+    viewer.send(JSON.stringify({ type: 'control', action: 'pause', enabled: true }));
+    assert.deepEqual(await nextPhone(), { type: 'control', action: 'pause', enabled: true });
+    viewer.send(JSON.stringify({ type: 'control', action: 'switch-camera' }));
+    assert.deepEqual(await nextPhone(), { type: 'control', action: 'switch-camera' });
+    const secondRoom = await fetch(`${base}/api/room`, { method: 'POST' });
+    const { code: secondCode } = await secondRoom.json();
+    assert.notEqual(secondCode, code);
+    const secondViewer = new WebSocket(`ws://127.0.0.1:${port}/signal`);
+    sockets.push(secondViewer);
+    const nextSecondViewer = messages(secondViewer);
+    await once(secondViewer, 'open');
+    secondViewer.send(JSON.stringify({ type: 'join', role: 'viewer', code: secondCode }));
+    assert.equal((await nextSecondViewer()).type, 'joined');
+    const secondPhone = new WebSocket(`ws://127.0.0.1:${port}/signal`);
+    sockets.push(secondPhone);
+    const nextSecondPhone = messages(secondPhone);
+    await once(secondPhone, 'open');
+    secondPhone.send(JSON.stringify({ type: 'join', role: 'phone', code: secondCode }));
+    assert.equal((await nextSecondPhone()).type, 'joined');
+    assert.equal((await nextSecondViewer()).type, 'paired');
+    assert.equal((await nextSecondPhone()).type, 'paired');
+    secondPhone.send(JSON.stringify({ type: 'offer', sdp: { type: 'offer', sdp: 'second-room' } }));
+    assert.equal((await nextSecondViewer()).sdp.sdp, 'second-room');
+    assert.equal((await fetch(`${base}/viewer.js`)).status, 200);
+    assert.equal((await fetch(`${base}/phone.js`)).status, 200);
   } finally {
     for (const socket of sockets) socket.terminate();
     await new Promise(resolve => { child.once('exit', resolve); child.kill(); });

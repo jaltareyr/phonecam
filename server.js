@@ -70,7 +70,9 @@ function attachSignaling(server) {
         return;
       }
       const client = clients.get(socket);
-      if (!client || !['offer', 'answer', 'candidate'].includes(message.type)) return;
+      if (!client || !['offer', 'answer', 'candidate', 'control'].includes(message.type)) return;
+      if (message.type === 'control' && (client.role !== 'viewer' || !['pause', 'switch-camera'].includes(message.action) ||
+          (message.action === 'pause' && typeof message.enabled !== 'boolean'))) return;
       if (JSON.stringify(message).length > 64 * 1024) return;
       const room = rooms.get(client.code);
       const peer = room?.[client.role === 'viewer' ? 'phone' : 'viewer'];
@@ -99,7 +101,7 @@ function handleRequest(req, res) {
     res.end(JSON.stringify({ ok: true, app: 'phonecam' }));
     return;
   }
-  const routes = { '/': 'viewer.html', '/viewer': 'viewer.html', '/phone': 'phone.html', '/app.js': 'app.js', '/style.css': 'style.css' };
+  const routes = { '/': 'viewer.html', '/viewer': 'viewer.html', '/phone': 'phone.html', '/viewer.js': 'viewer.js', '/phone.js': 'phone.js', '/style.css': 'style.css' };
   const name = routes[url.pathname];
   if (!name || req.method !== 'GET') { res.writeHead(404); res.end('Not found'); return; }
   const type = name.endsWith('.html') ? 'text/html; charset=utf-8' : name.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8';

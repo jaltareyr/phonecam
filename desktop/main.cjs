@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, globalShortcut } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 
@@ -41,8 +41,10 @@ async function createWindow() {
     title: 'PhoneCam',
     backgroundColor: '#091519',
     autoHideMenuBar: true,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
+    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') }
   });
+  if (process.argv.includes('--fullscreen')) mainWindow.setFullScreen(true);
+  if (process.argv.includes('--silent')) mainWindow.minimize();
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(`${baseUrl}/`)) event.preventDefault();
@@ -50,6 +52,12 @@ async function createWindow() {
   mainWindow.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   mainWindow.on('closed', () => { mainWindow = null; });
   await mainWindow.loadURL(`${baseUrl}/viewer`);
+  for (const [key, action] of Object.entries({
+    'CommandOrControl+Alt+S': 'snapshot',
+    'CommandOrControl+Alt+R': 'record',
+    'CommandOrControl+Alt+P': 'pause',
+    'CommandOrControl+Alt+N': 'new-camera'
+  })) globalShortcut.register(key, () => mainWindow?.webContents.send('phonecam-shortcut', action));
 }
 
 app.whenReady().then(createWindow).catch(error => {
@@ -59,5 +67,6 @@ app.whenReady().then(createWindow).catch(error => {
 
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
+  globalShortcut.unregisterAll();
   if (serverProcess && serverProcess.exitCode === null) serverProcess.kill();
 });
