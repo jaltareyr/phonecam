@@ -8,6 +8,7 @@
     "start": "node server.js",
     "desktop": "electron .",
     "package:win": "node scripts/package-desktop.mjs",
+    "portable:win": "node scripts/build-portable.mjs",
     "installer:win": "node scripts/build-installer.mjs",
     "test": "node --test"
   },
@@ -18,6 +19,7 @@
   },
   "devDependencies": {
     "@electron/packager": "^20.3.0",
-    "electron": "^44.9.0"
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
   }
 }

@@ -1,0 +1,9 @@
+appId: org.phonecam.desktop
+productName: PhoneCam
+directories:
+  output: release/portable
+artifactName: PhoneCam-Portable-${version}-x64.${ext}
+win:
+  target: portable
+  signAndEditExecutable: false
+publish: null

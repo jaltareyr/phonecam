@@ -15,14 +15,15 @@ On the PC, open `http://localhost:8080/viewer` and note the pairing code. Add ca
 
 ## Windows desktop app
 
-Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. For installation on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.2.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
+Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.2.0-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.2.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
 
 ```powershell
 npm ci
 npm run installer:win
+npm run portable:win
 ```
 
-On this computer, Node 24 is available at `C:\Users\Yashodhan Jaltare\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`. Building the installer also requires Inno Setup 6 and Visual Studio C++ Build Tools for the native camera binaries. The source development command is `npm run desktop` when the Node runtime is on `PATH`.
+On this computer, Node 24 is available at `C:\Users\Yashodhan Jaltare\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`. Building the installer also requires Inno Setup 6 and Visual Studio C++ Build Tools for the native camera binaries. Build the portable EXE after `npm run installer:win` or `npm run package:win`; it wraps the already packaged app. The source development command is `npm run desktop` when the Node runtime is on `PATH`.
 
 ### Android via USB
 
