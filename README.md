@@ -15,7 +15,7 @@ On the PC, open `http://localhost:8080/viewer` and note the pairing code. Add ca
 
 ## Windows desktop app
 
-Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.3.0-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.3.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
+Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.3.1-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.3.1-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
 
 ```powershell
 npm ci
@@ -37,6 +37,8 @@ adb reverse tcp:8080 tcp:8080
 On the phone, open `http://localhost:8080/phone` in Chrome. Enter the code, choose a camera, and allow access. Chrome treats `localhost` as a secure context for camera capture. The USB link uses ADB forwarding; video does not require iVCam's phone app.
 
 Choose the requested resolution and frame rate before pressing **Start camera**. The phone page shows the actual settings granted by Android and Chrome. Zoom, focus, exposure, and flashlight controls appear only when the browser exposes them for that camera. **Switch camera** in the Windows app changes front/rear camera in the existing connection where Android supports both; use the phone's camera selector and **Start camera** to choose a specific lens or change quality. Enable **Send phone microphone** to include audio, then press **Unmute** in the Windows app to hear it.
+
+If Android reports that it could not start the camera source, PhoneCam 0.3.1 retries at 480p/15 fps with the selected and alternate lenses. If all attempts fail, check Android's Camera access toggle and Chrome camera permission, close any other Chrome camera tabs, then restart Chrome. This error occurs before pairing or Zoom receives video.
 
 ### Android via Wi-Fi
 

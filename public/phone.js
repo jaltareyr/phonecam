@@ -31,6 +31,19 @@ function status(message) { statusElement.textContent = message; }
 function signal(message) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
 function closePeer() { peer?.close(); peer = null; pendingCandidates = []; }
 function videoTrack() { return stream?.getVideoTracks()[0]; }
+const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+function cameraErrorMessage(error) {
+  if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')
+    return 'Camera permission is blocked. Allow Camera for Chrome in Android Settings, then reload this page.';
+  if (error.name === 'SecurityError' || !window.isSecureContext)
+    return 'Camera access needs a trusted HTTPS connection. Install this PC’s PhoneCam certificate on Android, then reopen the page.';
+  if (['NotReadableError', 'AbortError'].includes(error.name))
+    return `Android could not start the camera. Check the Camera access toggle, close other camera tabs, and restart Chrome. ${error.message}`;
+  if (error.name === 'NotFoundError')
+    return 'Android could not find a usable camera. Try the other lens or restart Chrome.';
+  return `${error.name || 'Camera error'}: ${error.message}`;
+}
 
 function sendCameraState() {
   const track = videoTrack();
@@ -187,8 +200,32 @@ async function restartCapture() {
   };
   if (value.startsWith('device:')) video.deviceId = { exact: value.slice(7) };
   else { video.facingMode = value.slice(7); preferredFacing = value.slice(7); }
-  stream?.getTracks().forEach(track => track.stop());
-  stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    preview.srcObject = null;
+    await wait(300);
+  }
+  const alternateFacing = preferredFacing === 'user' ? 'environment' : 'user';
+  const lowQuality = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } };
+  const attempts = [video, { ...lowQuality, facingMode: { ideal: preferredFacing } },
+    { ...lowQuality, facingMode: { ideal: alternateFacing } }, lowQuality];
+  let lastError;
+  for (const [index, constraints] of attempts.entries()) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false });
+      if (index) status(`Camera started with fallback settings (${index + 1}/${attempts.length})`);
+      break;
+    } catch (error) {
+      lastError = error;
+      if (!['NotReadableError', 'AbortError', 'NotFoundError', 'OverconstrainedError'].includes(error.name)) break;
+      if (index < attempts.length - 1) {
+        status(`Camera did not start; trying another mode (${index + 2}/${attempts.length})…`);
+        await wait(300);
+      }
+    }
+  }
+  if (!stream) throw lastError;
   if (document.getElementById('send-audio').checked) {
     try {
       const audio = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
@@ -250,7 +287,7 @@ form.onsubmit = async event => {
     closePeer();
     await restartCapture();
     connect();
-  } catch (error) { status(`Camera error: ${error.message}`); }
+  } catch (error) { status(cameraErrorMessage(error)); }
 };
 
 zoom.oninput = async () => {

@@ -2,7 +2,7 @@
 
 The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEATURE_AUDIT.md). A built component is not counted as complete until its phone-to-Windows acceptance test passes.
 
-## Current baseline (0.3.0)
+## Current baseline (0.3.1)
 
 - [x] Android browser camera capture and WebRTC preview on a physical phone
 - [x] Local pairing server, separate pairing rooms, and signaling test
