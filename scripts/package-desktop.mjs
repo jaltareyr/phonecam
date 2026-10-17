@@ -22,6 +22,15 @@ const outputs = await packager({
   ignore
 });
 for (const output of outputs) {
+  const certificateSource = path.join(root, 'certs');
+  const certificateDestination = path.join(output, 'certs');
+  if (fs.existsSync(path.join(certificateSource, 'server-key.pem')) && fs.existsSync(path.join(certificateSource, 'server-cert.pem'))) {
+    fs.mkdirSync(certificateDestination, { recursive: true });
+    for (const file of ['server-key.pem', 'server-cert.pem', 'phonecam-ca.crt']) {
+      if (fs.existsSync(path.join(certificateSource, file))) fs.copyFileSync(path.join(certificateSource, file), path.join(certificateDestination, file));
+    }
+    console.log(`Included this PC's local Wi-Fi certificate: ${certificateDestination}`);
+  }
   const source = path.join(root, 'native', 'virtual-camera', 'x64', 'Release');
   const destination = path.join(output, 'native');
   const binaries = ['PhoneCamMediaSource.dll', 'PhoneCamCameraManager.exe'];

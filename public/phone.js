@@ -11,6 +11,12 @@ const exposureLock = document.getElementById('exposure-lock');
 const exposure = document.getElementById('exposure');
 const exposureValue = document.getElementById('exposure-value');
 const torch = document.getElementById('torch');
+const linkCode = new URLSearchParams(location.search).get('code');
+if (linkCode && /^[A-HJ-NP-Z2-9]{6}$/i.test(linkCode)) document.getElementById('pair-code').value = linkCode.toUpperCase();
+if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+  statusElement.textContent = 'Camera access requires a trusted HTTPS connection. Use USB mode or trust the local Wi-Fi certificate on Android.';
+  if (location.protocol === 'https:') document.getElementById('certificate-help').hidden = false;
+}
 let socket;
 let peer;
 let stream;

@@ -1,6 +1,6 @@
 # PhoneCam
 
-An independent Android-to-Windows camera app in development. The Android phone captures video and optional microphone audio in its browser; WebRTC sends it directly to a Windows desktop app. The local server handles pairing and signaling. The current build does **not** yet register a Windows webcam device.
+An independent Android-to-Windows camera app in development. The Android phone captures video and optional microphone audio in its browser; WebRTC sends it directly to a Windows desktop app. The local server handles pairing and signaling. The packaged build includes a native camera source, but Windows camera registration and video-call app compatibility are still unverified.
 
 ## Start
 
@@ -39,7 +39,7 @@ Choose the requested resolution and frame rate before pressing **Start camera**.
 
 ### Android via Wi-Fi
 
-Both devices must be on the same network. Create a local certificate with the PC's LAN IP:
+In the Windows app, choose **Wi-Fi** in the right panel. It shows this PC's LAN address and a **Copy address** button that includes the pairing code. Both devices must be on the same network. The packaged build on this PC includes a local certificate for its current Wi-Fi address. If the address changes, create a new certificate with the new IP and repackage the app:
 
 ```powershell
 python -m pip install cryptography
@@ -47,7 +47,7 @@ python scripts/make_cert.py --ip 192.168.1.10
 npm start
 ```
 
-Use the actual address printed by `npm start` in place of the example IP. On the phone, open `https://PC-IP:8443/phone`, accept the development certificate, and pair. Some browsers may refuse camera access until the certificate is trusted by Android; USB is the reliable first path. Certificate files and keys stay in `certs/` and are ignored by Git.
+Use the actual address shown in the Windows app in place of the example IP. Open the address in Android Chrome and start the camera. Android must trust the local certificate authority for camera access; simply bypassing a certificate warning may leave Chrome without a secure context. The Wi-Fi panel links to the CA certificate, and the phone page shows the same download if camera access is blocked. Install it using Android's **Install a CA certificate** setting, then reopen the phone page. Only install the certificate generated on your own PC. The packaged server key and certificate are specific to this PC and should not be shared. The CA private key stays in the source `certs/` folder and is never packaged. Source certificate files stay in `certs/` and are ignored by Git.
 
 ## Architecture
 

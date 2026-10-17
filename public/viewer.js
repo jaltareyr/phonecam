@@ -6,11 +6,15 @@ function signal(camera, message) {
   if (camera.socket?.readyState === WebSocket.OPEN) camera.socket.send(JSON.stringify(message));
 }
 
-function status(camera, message) { camera.status.textContent = message; }
+function status(camera, message) {
+  camera.status.textContent = message;
+  if (selectedCamera === camera) document.querySelector('.connection-label').lastChild.textContent = ` ${message}`;
+}
 
 function selectCamera(camera) {
   for (const item of cameras) item.card.classList.toggle('selected', item === camera);
   selectedCamera = camera;
+  document.querySelector('.connection-label').lastChild.textContent = ` ${camera.status.textContent}`;
   window.phoneCamDesktop?.clearFrame();
 }
 
@@ -208,10 +212,46 @@ function togglePause(camera) {
   camera.pauseButton.textContent = camera.paused ? 'Resume' : 'Pause';
 }
 
+async function showConnection(camera) {
+  try {
+    const response = await fetch('/api/connectivity');
+    if (!response.ok) throw new Error('Could not read network information');
+    const info = await response.json();
+    const preferred = info.wifi.find(item => item.certificateMatches) || info.wifi[0];
+    camera.wifiUrl = preferred?.url || '';
+    camera.wifiAddress.textContent = preferred?.url || 'No Wi-Fi address found';
+    camera.wifiNote.textContent = !info.tlsReady ? 'Wi-Fi setup needs a local HTTPS certificate.'
+      : !preferred ? 'Connect this PC to Wi-Fi to show an address.'
+      : !preferred.certificateMatches ? 'The PC address changed. Refresh the local certificate before connecting.'
+      : 'Copy address includes the pairing code. Android must trust this PC’s local certificate for camera access.';
+    if (preferred && info.certificateAvailable) {
+      const link = document.createElement('a');
+      link.href = preferred.url.replace(/\/phone$/, '/phonecam-ca.crt');
+      link.textContent = 'Download Wi-Fi certificate on Android';
+      camera.wifiNote.append(document.createElement('br'), link);
+    }
+    camera.copyButton.disabled = !preferred;
+    camera.usbAddress.textContent = info.usbUrl;
+  } catch (error) {
+    camera.wifiAddress.textContent = 'Wi-Fi address unavailable';
+    camera.wifiNote.textContent = error.message;
+  }
+}
+
+function connectionMode(camera, mode) {
+  camera.card.querySelectorAll('[data-mode]').forEach(button => {
+    const active = button.dataset.mode === mode;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  camera.card.querySelector('.wifi-instructions').hidden = mode !== 'wifi';
+  camera.card.querySelector('.usb-instructions').hidden = mode !== 'usb';
+}
+
 function addCamera() {
   const card = document.createElement('section');
   card.className = 'card camera-card';
-  card.innerHTML = `<div class="camera-head"><div><div class="label">Pairing code</div><div class="code">······</div></div><button class="danger remove" type="button">Remove</button></div><div class="preview-shell"><video class="source-video" autoplay muted playsinline></video><canvas class="preview"></canvas><div class="empty-state"><div class="connection-art" aria-hidden="true"><span class="phone-art"></span><span class="connection-waves">◌ ◌</span><span class="monitor-art"></span></div><strong>Waiting for phone</strong><span>Open PhoneCam on Android and enter the code above</span></div></div><div class="camera-state"><span class="state-dot"></span><span class="status">Creating room…</span><span class="details small"></span></div><audio autoplay muted></audio><div class="toolbar"><button class="snapshot secondary" disabled>Snapshot</button><button class="record secondary" disabled>Record</button><button class="pause secondary" disabled>Pause</button><button class="switch-camera secondary" disabled>Switch camera</button><button class="audio-button secondary" disabled>Unmute</button><button class="mirror secondary">Mirror</button><button class="rotate secondary">Rotate 90°</button><button class="new-code secondary">New code</button></div><div class="effect-row"><label class="label">Effect</label><select class="effect"><option value="none">None</option><option value="mono">Monochrome</option><option value="warm">Warm</option><option value="soft">Soft focus</option><option value="pixel">Mosaic</option></select></div>`;
+  card.innerHTML = `<div class="camera-layout"><div class="video-column"><div class="preview-heading"><div><strong>Live preview</strong><span class="details small">Waiting for video</span></div><button class="danger remove" type="button">Remove camera</button></div><div class="preview-shell"><video class="source-video" autoplay muted playsinline></video><canvas class="preview"></canvas><div class="empty-state"><div class="connection-art" aria-hidden="true"><span class="phone-art"></span><span class="connection-waves">◌ ◌</span><span class="monitor-art"></span></div><strong>Waiting for phone</strong><span>Choose Wi-Fi or USB on the right to connect</span></div></div><div class="camera-state"><span class="state-dot"></span><span class="status">Creating room…</span></div><audio autoplay muted></audio><div class="control-panel"><div class="panel-title">Camera controls</div><div class="control-grid"><button class="switch-camera secondary" disabled>⇄ <span>Switch camera</span></button><button class="mirror secondary" aria-pressed="false">⇋ <span>Mirror</span></button><button class="rotate secondary">⟳ <span>Rotate 90°</span></button><button class="pause secondary" disabled>⏸ <span>Pause</span></button><button class="audio-button secondary" disabled>♪ <span>Unmute</span></button></div><div class="effect-row"><label class="label">Video effect</label><select class="effect"><option value="none">None</option><option value="mono">Monochrome</option><option value="warm">Warm</option><option value="soft">Soft focus</option><option value="pixel">Mosaic</option></select></div></div><div class="capture-bar"><button class="snapshot secondary" disabled>◎ Snapshot</button><button class="record secondary" disabled>● Record</button></div></div><aside class="connect-panel"><div class="panel-title">Connect your phone</div><p class="connect-intro">Choose how your Android phone reaches this PC.</p><div class="mode-tabs" role="tablist" aria-label="Connection method"><button type="button" data-mode="wifi" class="active" role="tab" aria-selected="true">◉ Wi-Fi</button><button type="button" data-mode="usb" role="tab" aria-selected="false">⚡ USB</button></div><div class="wifi-instructions"><div class="step"><b>1</b><div><strong>Same Wi-Fi</strong><p>Connect your phone and this PC to the same network.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address wifi-address">Finding PC address…</div><button type="button" class="copy-link secondary">Copy address</button><p class="wifi-note"></p></div></div></div><div class="usb-instructions" hidden><div class="step"><b>1</b><div><strong>Connect USB cable</strong><p>Enable USB debugging, then allow this PC on your phone.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address usb-address">http://localhost:8080/phone</div><p>ADB reverse forwarding must be active on this PC.</p></div></div></div><div class="step code-step"><b>3</b><div><strong>Enter this pairing code</strong><div class="code">······</div><button class="new-code secondary" type="button">Get new code</button></div></div><p class="connect-footer">Allow camera access on your phone and tap <strong>Start camera</strong>. The live feed will appear here.</p></aside></div>`;
   const camera = {
     card, codeElement: card.querySelector('.code'), status: card.querySelector('.status'),
     details: card.querySelector('.details'), source: card.querySelector('video'),
@@ -219,6 +259,8 @@ function addCamera() {
     recordButton: card.querySelector('.record'), snapshotButton: card.querySelector('.snapshot'),
     pauseButton: card.querySelector('.pause'), audioButton: card.querySelector('.audio-button'),
     switchButton: card.querySelector('.switch-camera'),
+    wifiAddress: card.querySelector('.wifi-address'), wifiNote: card.querySelector('.wifi-note'),
+    usbAddress: card.querySelector('.usb-address'), copyButton: card.querySelector('.copy-link'),
     effect: card.querySelector('.effect'), pixelCanvas: document.createElement('canvas'),
     bridgeCanvas: document.createElement('canvas'),
     pendingCandidates: [], mirrored: false, rotation: 0, paused: false
@@ -230,6 +272,11 @@ function addCamera() {
   selectCamera(camera);
   renderFrame(camera);
   card.onclick = () => selectCamera(camera);
+  card.querySelectorAll('[data-mode]').forEach(button => button.onclick = () => connectionMode(camera, button.dataset.mode));
+  camera.copyButton.onclick = async () => {
+    try { await navigator.clipboard.writeText(`${camera.wifiUrl}?code=${camera.code}`); camera.copyButton.textContent = 'Copied'; }
+    catch { status(camera, 'Could not copy address. Select and copy the address above.'); }
+  };
   camera.snapshotButton.onclick = () => snapshot(camera);
   camera.recordButton.onclick = () => toggleRecording(camera);
   camera.pauseButton.onclick = () => togglePause(camera);
@@ -239,8 +286,8 @@ function addCamera() {
     camera.audioButton.textContent = camera.audio.muted ? 'Unmute' : 'Mute';
     if (!camera.audio.muted) camera.audio.play().catch(() => {});
   };
-  card.querySelector('.mirror').onclick = () => { camera.mirrored = !camera.mirrored; };
-  card.querySelector('.rotate').onclick = () => { camera.rotation = (camera.rotation + 90) % 360; };
+  card.querySelector('.mirror').onclick = event => { camera.mirrored = !camera.mirrored; event.currentTarget.setAttribute('aria-pressed', String(camera.mirrored)); };
+  card.querySelector('.rotate').onclick = () => { camera.rotation = (camera.rotation + 90) % 360; card.querySelector('.rotate span').textContent = `Rotate ${camera.rotation}°`; };
   card.querySelector('.new-code').onclick = () => newCode(camera).catch(error => status(camera, error.message));
   card.querySelector('.remove').onclick = () => {
     camera.recorder?.state === 'recording' && camera.recorder.stop();
@@ -249,12 +296,24 @@ function addCamera() {
     cameras.delete(camera);
     cancelAnimationFrame(camera.frameRequest);
     card.remove();
-    if (selectedCamera === camera) selectCamera(cameras.values().next().value || null);
+    if (selectedCamera === camera) {
+      const next = cameras.values().next().value;
+      if (next) selectCamera(next);
+      else { selectedCamera = null; window.phoneCamDesktop?.clearFrame(); }
+    }
   };
   newCode(camera).catch(error => status(camera, error.message));
+  showConnection(camera);
 }
 
 document.getElementById('add-camera').onclick = addCamera;
+document.querySelectorAll('[data-section]').forEach(button => button.onclick = () => {
+  document.querySelectorAll('[data-section]').forEach(item => item.classList.toggle('rail-active', item === button));
+  const target = button.dataset.section === 'connect' ? selectedCamera?.card.querySelector('.connect-panel')
+    : button.dataset.section === 'settings' ? selectedCamera?.card.querySelector('.control-panel')
+    : selectedCamera?.card.querySelector('.preview-shell');
+  target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
 document.addEventListener('keydown', event => {
   if (!event.ctrlKey || event.altKey || event.metaKey) return;
   const key = event.key.toLowerCase();

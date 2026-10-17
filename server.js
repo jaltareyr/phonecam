@@ -11,7 +11,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
 const httpPort = Number(process.env.PHONECAM_HTTP_PORT || 8080);
 const httpsPort = Number(process.env.PHONECAM_HTTPS_PORT || 8443);
-const certDir = path.join(root, 'certs');
+const certDir = process.env.PHONECAM_CERT_DIR || path.join(root, 'certs');
 const rooms = new Map();
 const clients = new Map();
 const codePattern = /^[A-HJ-NP-Z2-9]{6}$/;
@@ -85,6 +85,27 @@ function attachSignaling(server) {
 
 function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  if (url.pathname === '/api/connectivity' && req.method === 'GET') {
+    const addresses = Object.values(os.networkInterfaces()).flatMap(values => values || [])
+      .filter(address => address.family === 'IPv4' && !address.internal &&
+        !address.address.startsWith('169.254.') && !address.address.startsWith('172.29.'))
+      .map(address => address.address);
+    const tlsReady = fs.existsSync(keyPath) && fs.existsSync(certPath);
+    const certificate = tlsReady ? new crypto.X509Certificate(fs.readFileSync(certPath)) : null;
+    const wifi = addresses.map(address => ({
+      address,
+      url: `https://${address}:${httpsPort}/phone`,
+      certificateMatches: Boolean(certificate?.subjectAltName?.includes(`IP Address:${address}`))
+    }));
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify({ wifi, tlsReady, usbUrl: `http://localhost:${httpPort}/phone`, certificateAvailable: fs.existsSync(path.join(certDir, 'phonecam-ca.crt')) }));
+    return;
+  }
+  if (url.pathname === '/phonecam-ca.crt' && req.method === 'GET' && fs.existsSync(path.join(certDir, 'phonecam-ca.crt'))) {
+    res.writeHead(200, { 'Content-Type': 'application/x-x509-ca-cert', 'Content-Disposition': 'attachment; filename="phonecam-ca.crt"', 'Cache-Control': 'no-store' });
+    fs.createReadStream(path.join(certDir, 'phonecam-ca.crt')).pipe(res);
+    return;
+  }
   if (url.pathname === '/api/room' && req.method === 'POST') {
     const code = roomCode();
     rooms.set(code, { viewer: null, phone: null });

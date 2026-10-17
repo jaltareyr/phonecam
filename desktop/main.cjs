@@ -35,7 +35,8 @@ async function ensureServer() {
   if (await serverIsReady()) return;
   const script = path.join(app.getAppPath(), 'server.js');
   serverProcess = spawn(process.execPath, [script], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1',
+      PHONECAM_CERT_DIR: app.isPackaged ? path.join(path.dirname(process.execPath), 'certs') : path.join(app.getAppPath(), 'certs') },
     windowsHide: true,
     stdio: 'ignore'
   });

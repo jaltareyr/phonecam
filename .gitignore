@@ -2,6 +2,8 @@ node_modules/
 tools/
 certs/
 *.log
+__pycache__/
+*.pyc
 release/
 native/virtual-camera/packages/
 native/virtual-camera/x64/
