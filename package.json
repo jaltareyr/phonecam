@@ -3,11 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "desktop/main.cjs",
   "scripts": {
     "start": "node server.js",
+    "desktop": "electron .",
+    "package:win": "node scripts/package-desktop.mjs",
     "test": "node --test"
   },
   "dependencies": {
     "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "electron": "^44.9.0"
   }
 }

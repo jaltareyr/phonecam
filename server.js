@@ -96,7 +96,7 @@ function handleRequest(req, res) {
   }
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true }));
+    res.end(JSON.stringify({ ok: true, app: 'phonecam' }));
     return;
   }
   const routes = { '/': 'viewer.html', '/viewer': 'viewer.html', '/phone': 'phone.html', '/app.js': 'app.js', '/style.css': 'style.css' };

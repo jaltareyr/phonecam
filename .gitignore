@@ -2,3 +2,4 @@ node_modules/
 tools/
 certs/
 *.log
+release/

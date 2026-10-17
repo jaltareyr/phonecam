@@ -1,10 +1,10 @@
 # PhoneCam
 
-An independent Android-to-Windows camera prototype. The Android phone captures video in its browser; WebRTC sends it directly to a PC viewer. The local Node server handles pairing and signaling. This first milestone does **not** yet register a Windows webcam device or carry microphone audio.
+An independent Android-to-Windows camera prototype. The Android phone captures video in its browser; WebRTC sends it directly to a Windows desktop app. The local server handles pairing and signaling. The current build does **not** yet register a Windows webcam device or carry microphone audio.
 
 ## Start
 
-PhoneCam runs with Node.js 20+. REA's separate CLI requires Node.js 22.19+ or 24.11+.
+The local server runs with Node.js 20+. Desktop development and packaging require Node.js 22.12+; this computer uses the available Node 24 runtime. The packaged Windows app includes its own runtime. REA's separate CLI requires Node.js 22.19+ or 24.11+.
 
 ```powershell
 npm install
@@ -12,6 +12,17 @@ npm start
 ```
 
 On the PC, open `http://localhost:8080/viewer` and note the pairing code. The HTTP listener binds only to this PC's loopback interface.
+
+## Windows desktop app
+
+Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. To rebuild from source with Node 22.12+ on `PATH`:
+
+```powershell
+npm ci
+npm run package:win
+```
+
+On this computer, Node 24 is available at `C:\Users\Yashodhan Jaltare\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`. The source development command is `npm run desktop` when that runtime is on `PATH`.
 
 ### Android via USB
 
@@ -38,7 +49,7 @@ Use the actual address printed by `npm start` in place of the example IP. On the
 
 ## Architecture
 
-`phone browser camera -> WebRTC video -> PC browser preview`
+`phone browser camera -> WebRTC video -> Windows app preview`
 
 `server.js` creates short-lived pairing rooms and relays WebRTC signaling only. It does not relay video or store frames. A six-character room code keeps casual cross-connections apart; this is a local prototype, not an internet-facing authentication system.
 
@@ -51,5 +62,5 @@ Native function analysis needs Ghidra 12.1.x and a compatible JDK. Those are not
 ## Next milestones
 
 1. Validate Android camera streaming on the actual phone and measure latency.
-2. Build a Windows receiver app and virtual camera using Microsoft's Media Foundation virtual camera API.
-3. Add audio, camera controls, resilient reconnects, and packaging.
+2. Feed video frames from the Windows receiver into a Media Foundation virtual camera.
+3. Add audio, camera controls, resilient reconnects, and an installer.

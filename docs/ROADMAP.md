@@ -8,12 +8,14 @@
 - [x] USB path through ADB reverse forwarding
 - [x] Optional HTTPS listener for LAN use
 - [x] Automated pairing and signaling check
+- [x] Packaged Windows desktop viewer with local server lifecycle
+- [x] Native check that this Windows build supports a software virtual camera
 - [ ] Test video with a physical Android phone (no device was connected during development)
 
 ## Next milestone: usable Windows webcam
 
-- [ ] Windows receiver with connection state and video preview
 - [ ] Media Foundation virtual camera source and registration
+- [ ] Frame bridge from the receiver to the camera source
 - [ ] Test visibility and capture in Windows Camera, OBS, and a meeting app
 - [ ] Install/uninstall flow that leaves no orphaned camera device
 
