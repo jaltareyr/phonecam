@@ -2,6 +2,23 @@ const grid = document.getElementById('streams');
 const cameras = new Set();
 let selectedCamera = null;
 
+function processedOutput(camera) {
+  return camera.mirrored || camera.rotation !== 0 || camera.effect.value !== 'none' ||
+    camera.overlayImage || [...camera.colorInputs].some(input => Number(input.value) !== Number(input.dataset.default));
+}
+
+function videoFilter(camera) {
+  const value = name => Number(camera.card.querySelector(`[data-color="${name}"]`).value);
+  const parts = [
+    `brightness(${value('brightness')}%)`, `contrast(${value('contrast')}%)`,
+    `saturate(${value('saturation')}%)`, `hue-rotate(${value('hue')}deg)`
+  ];
+  if (camera.effect.value === 'mono') parts.push('grayscale(1)');
+  if (camera.effect.value === 'warm') parts.push('sepia(.55)', 'saturate(1.25)');
+  if (camera.effect.value === 'soft') parts.push('blur(3px)');
+  return parts.join(' ');
+}
+
 function signal(camera, message) {
   if (camera.socket?.readyState === WebSocket.OPEN) camera.socket.send(JSON.stringify(message));
 }
@@ -35,8 +52,24 @@ function stopPeer(camera) {
   camera.audioButton.disabled = true;
   camera.pauseButton.disabled = true;
   camera.switchButton.disabled = true;
+  camera.zoomInput.disabled = true;
+  camera.zoomValue.textContent = 'Unavailable';
+  camera.focusSupported = false;
+  camera.focusHint.textContent = 'Tap focus unavailable on this phone';
   camera.preview.width = 1;
   camera.preview.height = 1;
+}
+
+function retryConnection(camera) {
+  if (!cameras.has(camera) || camera.retryTimer || camera.reconnectBlocked) return;
+  stopPeer(camera);
+  const delay = camera.retryDelay || 1000;
+  status(camera, `Reconnecting in ${Math.round(delay / 1000)}s…`);
+  camera.retryTimer = setTimeout(() => {
+    camera.retryTimer = null;
+    if (cameras.has(camera)) connect(camera);
+  }, delay);
+  camera.retryDelay = Math.min(delay * 2, 10_000);
 }
 
 function renderFrame(camera) {
@@ -59,7 +92,7 @@ function renderFrame(camera) {
     else if (camera.rotation === 180) { ctx.translate(canvas.width, canvas.height); ctx.rotate(Math.PI); }
     else if (camera.rotation === 270) { ctx.translate(0, canvas.height); ctx.rotate(-Math.PI / 2); }
     const filter = camera.effect.value;
-    ctx.filter = filter === 'mono' ? 'grayscale(1)' : filter === 'warm' ? 'sepia(.55) saturate(1.25)' : filter === 'soft' ? 'blur(3px)' : 'none';
+    ctx.filter = videoFilter(camera);
     if (filter === 'pixel') {
       const small = camera.pixelCanvas;
       small.width = Math.max(1, Math.round(video.videoWidth / 24));
@@ -69,6 +102,7 @@ function renderFrame(camera) {
       ctx.drawImage(small, 0, 0, video.videoWidth, video.videoHeight);
     } else ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
     ctx.restore();
+    if (camera.overlayImage) ctx.drawImage(camera.overlayImage, 0, 0, canvas.width, canvas.height);
     if (camera === selectedCamera && window.phoneCamDesktop?.sendFrame &&
         performance.now() - (camera.lastExport || 0) >= 33) {
       camera.lastExport = performance.now();
@@ -113,8 +147,15 @@ function makePeer(camera) {
     if (settings?.width) camera.details.textContent = `${settings.width} × ${settings.height}${settings.frameRate ? ` · ${Math.round(settings.frameRate)} fps` : ''}`;
   };
   peer.onconnectionstatechange = () => {
+    if (camera.peer !== peer) return;
     if (peer.connectionState === 'connected') status(camera, 'Connected');
-    if (['failed', 'disconnected'].includes(peer.connectionState)) status(camera, 'Connection interrupted');
+    if (peer.connectionState === 'failed') camera.socket?.close();
+    if (peer.connectionState === 'disconnected') {
+      status(camera, 'Connection interrupted');
+      setTimeout(() => {
+        if (camera.peer === peer && peer.connectionState === 'disconnected') camera.socket?.close();
+      }, 5000);
+    }
   };
   return peer;
 }
@@ -129,13 +170,38 @@ function connect(camera) {
   camera.socket?.close();
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/signal`);
   camera.socket = socket;
-  socket.onopen = () => signal(camera, { type: 'join', role: 'viewer', code: camera.code });
+  socket.onopen = () => {
+    camera.retryDelay = 1000;
+    signal(camera, { type: 'join', role: 'viewer', code: camera.code });
+  };
   socket.onmessage = async event => {
     const message = JSON.parse(event.data);
     try {
-      if (message.type === 'error') { status(camera, message.message); return; }
+      if (message.type === 'error') {
+        status(camera, message.message);
+        if (message.message.includes('Pairing code unavailable')) {
+          camera.reconnectBlocked = true;
+          socket.close();
+        }
+        return;
+      }
       if (message.type === 'joined') { status(camera, 'Waiting for phone…'); return; }
       if (message.type === 'paired') { status(camera, 'Pairing…'); return; }
+      if (message.type === 'camera-state') {
+        const zoom = message.zoom;
+        if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) &&
+            zoom.min >= 0.1 && zoom.max <= 100 && zoom.max > zoom.min) {
+          camera.zoomInput.min = String(zoom.min);
+          camera.zoomInput.max = String(zoom.max);
+          camera.zoomInput.step = String(zoom.step || 0.1);
+          camera.zoomInput.value = String(zoom.value || zoom.min);
+          camera.zoomInput.disabled = false;
+          camera.zoomValue.textContent = `${Number(camera.zoomInput.value).toFixed(1)}×`;
+        } else { camera.zoomInput.disabled = true; camera.zoomValue.textContent = 'Unavailable'; }
+        camera.focusSupported = Boolean(message.focusSupported);
+        camera.focusHint.textContent = camera.focusSupported ? 'Click the video to focus' : 'Tap focus unavailable on this phone';
+        return;
+      }
       if (message.type === 'offer') {
         const peer = makePeer(camera);
         await peer.setRemoteDescription(message.sdp);
@@ -154,10 +220,14 @@ function connect(camera) {
     } catch (error) { status(camera, `Connection error: ${error.message}`); }
   };
   socket.onerror = () => { if (camera.socket === socket) status(camera, 'Signaling error'); };
-  socket.onclose = () => { if (camera.socket === socket && cameras.has(camera) && !camera.peer) status(camera, 'Server connection closed'); };
+  socket.onclose = () => { if (camera.socket === socket) retryConnection(camera); };
 }
 
 async function newCode(camera) {
+  clearTimeout(camera.retryTimer);
+  camera.retryTimer = null;
+  camera.retryDelay = 1000;
+  camera.reconnectBlocked = false;
   stopPeer(camera);
   const response = await fetch('/api/room', { method: 'POST' });
   if (!response.ok) throw new Error('Could not create a pairing code');
@@ -185,7 +255,7 @@ function toggleRecording(camera) {
   if (!camera.stream) return;
   try {
     if (!window.MediaRecorder) throw new Error('Recording is unavailable in this browser');
-    const useProcessed = camera.mirrored || camera.rotation !== 0 || camera.effect.value !== 'none';
+    const useProcessed = processedOutput(camera);
     const recordingStream = useProcessed ? camera.preview.captureStream(30) : camera.stream;
     if (useProcessed) for (const track of camera.stream.getAudioTracks()) recordingStream.addTrack(track);
     const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
@@ -193,16 +263,27 @@ function toggleRecording(camera) {
     const chunks = [];
     const recorder = new MediaRecorder(recordingStream, mime ? { mimeType: mime } : undefined);
     camera.recorder = recorder;
+    camera.discardRecording = false;
     recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
     recorder.onerror = event => status(camera, `Recording error: ${event.error?.message || 'unknown error'}`);
     recorder.onstop = () => {
-      if (chunks.length) download(new Blob(chunks, { type: recorder.mimeType }), recorder.mimeType.includes('mp4') ? 'mp4' : 'webm');
+      if (chunks.length && !camera.discardRecording) download(new Blob(chunks, { type: recorder.mimeType }), recorder.mimeType.includes('mp4') ? 'mp4' : 'webm');
       camera.recordButton.textContent = 'Record';
+      camera.cancelButton.disabled = true;
+      camera.recorder = null;
       if (useProcessed) for (const track of recordingStream.getVideoTracks()) track.stop();
     };
     recorder.start(1000);
     camera.recordButton.textContent = 'Stop recording';
+    camera.cancelButton.disabled = false;
   } catch (error) { status(camera, `Recording error: ${error.message}`); }
+}
+
+function discardRecording(camera) {
+  if (camera.recorder?.state !== 'recording') return;
+  camera.discardRecording = true;
+  camera.recorder.stop();
+  status(camera, 'Recording discarded');
 }
 
 function togglePause(camera) {
@@ -252,11 +333,17 @@ function addCamera() {
   const card = document.createElement('section');
   card.className = 'card camera-card';
   card.innerHTML = `<div class="camera-layout"><div class="video-column"><div class="preview-heading"><div><strong>Live preview</strong><span class="details small">Waiting for video</span></div><button class="danger remove" type="button">Remove camera</button></div><div class="preview-shell"><video class="source-video" autoplay muted playsinline></video><canvas class="preview"></canvas><div class="empty-state"><div class="connection-art" aria-hidden="true"><span class="phone-art"></span><span class="connection-waves">◌ ◌</span><span class="monitor-art"></span></div><strong>Waiting for phone</strong><span>Choose Wi-Fi or USB on the right to connect</span></div></div><div class="camera-state"><span class="state-dot"></span><span class="status">Creating room…</span></div><audio autoplay muted></audio><div class="control-panel"><div class="panel-title">Camera controls</div><div class="control-grid"><button class="switch-camera secondary" disabled>⇄ <span>Switch camera</span></button><button class="mirror secondary" aria-pressed="false">⇋ <span>Mirror</span></button><button class="rotate secondary">⟳ <span>Rotate 90°</span></button><button class="pause secondary" disabled>⏸ <span>Pause</span></button><button class="audio-button secondary" disabled>♪ <span>Unmute</span></button></div><div class="effect-row"><label class="label">Video effect</label><select class="effect"><option value="none">None</option><option value="mono">Monochrome</option><option value="warm">Warm</option><option value="soft">Soft focus</option><option value="pixel">Mosaic</option></select></div></div><div class="capture-bar"><button class="snapshot secondary" disabled>◎ Snapshot</button><button class="record secondary" disabled>● Record</button></div></div><aside class="connect-panel"><div class="panel-title">Connect your phone</div><p class="connect-intro">Choose how your Android phone reaches this PC.</p><div class="mode-tabs" role="tablist" aria-label="Connection method"><button type="button" data-mode="wifi" class="active" role="tab" aria-selected="true">◉ Wi-Fi</button><button type="button" data-mode="usb" role="tab" aria-selected="false">⚡ USB</button></div><div class="wifi-instructions"><div class="step"><b>1</b><div><strong>Same Wi-Fi</strong><p>Connect your phone and this PC to the same network.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address wifi-address">Finding PC address…</div><button type="button" class="copy-link secondary">Copy address</button><p class="wifi-note"></p></div></div></div><div class="usb-instructions" hidden><div class="step"><b>1</b><div><strong>Connect USB cable</strong><p>Enable USB debugging, then allow this PC on your phone.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address usb-address">http://localhost:8080/phone</div><p>ADB reverse forwarding must be active on this PC.</p></div></div></div><div class="step code-step"><b>3</b><div><strong>Enter this pairing code</strong><div class="code">······</div><button class="new-code secondary" type="button">Get new code</button></div></div><p class="connect-footer">Allow camera access on your phone and tap <strong>Start camera</strong>. The live feed will appear here.</p></aside></div>`;
+  card.querySelector('.effect-row').insertAdjacentHTML('afterend', `<details class="color-panel"><summary>Color and overlay</summary><div class="color-grid"><label>Brightness <input data-color="brightness" data-default="100" type="range" min="0" max="200" value="100"></label><label>Contrast <input data-color="contrast" data-default="100" type="range" min="0" max="200" value="100"></label><label>Saturation <input data-color="saturation" data-default="100" type="range" min="0" max="200" value="100"></label><label>Hue <input data-color="hue" data-default="0" type="range" min="-180" max="180" value="0"></label></div><label class="overlay-label">Overlay image <input class="overlay-file" type="file" accept="image/*"></label><button type="button" class="remove-overlay secondary">Remove overlay</button><button type="button" class="reset-color secondary">Reset color</button></details>`);
+  card.querySelector('.effect-row').insertAdjacentHTML('afterend', '<div class="pc-zoom"><label>Phone zoom <input class="pc-zoom-input" type="range" min="1" max="2" step="0.1" value="1" disabled></label><span class="pc-zoom-value">Unavailable</span></div><p class="focus-hint">Tap focus unavailable on this phone</p>');
+  card.querySelector('.capture-bar').insertAdjacentHTML('beforeend', '<button class="cancel-recording secondary" disabled>Discard recording</button>');
   const camera = {
     card, codeElement: card.querySelector('.code'), status: card.querySelector('.status'),
     details: card.querySelector('.details'), source: card.querySelector('video'),
     preview: card.querySelector('canvas'), audio: card.querySelector('audio'),
     recordButton: card.querySelector('.record'), snapshotButton: card.querySelector('.snapshot'),
+    cancelButton: card.querySelector('.cancel-recording'), colorInputs: card.querySelectorAll('[data-color]'),
+    zoomInput: card.querySelector('.pc-zoom-input'), zoomValue: card.querySelector('.pc-zoom-value'),
+    focusHint: card.querySelector('.focus-hint'), focusSupported: false,
     pauseButton: card.querySelector('.pause'), audioButton: card.querySelector('.audio-button'),
     switchButton: card.querySelector('.switch-camera'),
     wifiAddress: card.querySelector('.wifi-address'), wifiNote: card.querySelector('.wifi-note'),
@@ -279,6 +366,36 @@ function addCamera() {
   };
   camera.snapshotButton.onclick = () => snapshot(camera);
   camera.recordButton.onclick = () => toggleRecording(camera);
+  camera.cancelButton.onclick = () => discardRecording(camera);
+  camera.zoomInput.oninput = () => {
+    camera.zoomValue.textContent = `${Number(camera.zoomInput.value).toFixed(1)}×`;
+    signal(camera, { type: 'control', action: 'zoom', value: Number(camera.zoomInput.value) });
+  };
+  camera.preview.onclick = event => {
+    if (!camera.focusSupported) return;
+    const bounds = camera.preview.getBoundingClientRect();
+    let u = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+    const v = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+    if (camera.mirrored) u = 1 - u;
+    const point = camera.rotation === 90 ? { x: v, y: 1 - u }
+      : camera.rotation === 180 ? { x: 1 - u, y: 1 - v }
+      : camera.rotation === 270 ? { x: 1 - v, y: u } : { x: u, y: v };
+    signal(camera, { type: 'control', action: 'focus', ...point });
+  };
+  card.querySelector('.reset-color').onclick = () => camera.colorInputs.forEach(input => { input.value = input.dataset.default; });
+  card.querySelector('.remove-overlay').onclick = () => {
+    camera.overlayImage = null;
+    card.querySelector('.overlay-file').value = '';
+  };
+  card.querySelector('.overlay-file').onchange = event => {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => { camera.overlayImage = image; URL.revokeObjectURL(url); };
+    image.onerror = () => { URL.revokeObjectURL(url); status(camera, 'Could not load overlay image'); };
+    image.src = url;
+  };
   camera.pauseButton.onclick = () => togglePause(camera);
   camera.switchButton.onclick = () => signal(camera, { type: 'control', action: 'switch-camera' });
   camera.audioButton.onclick = () => {
@@ -290,6 +407,8 @@ function addCamera() {
   card.querySelector('.rotate').onclick = () => { camera.rotation = (camera.rotation + 90) % 360; card.querySelector('.rotate span').textContent = `Rotate ${camera.rotation}°`; };
   card.querySelector('.new-code').onclick = () => newCode(camera).catch(error => status(camera, error.message));
   card.querySelector('.remove').onclick = () => {
+    clearTimeout(camera.retryTimer);
+    camera.reconnectBlocked = true;
     camera.recorder?.state === 'recording' && camera.recorder.stop();
     camera.socket?.close();
     stopPeer(camera);
@@ -307,6 +426,24 @@ function addCamera() {
 }
 
 document.getElementById('add-camera').onclick = addCamera;
+const fullscreenButton = document.getElementById('fullscreen');
+fullscreenButton.onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+};
+document.addEventListener('fullscreenchange', () => {
+  fullscreenButton.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
+});
+const alwaysOnTopButton = document.getElementById('always-on-top');
+if (window.phoneCamDesktop?.setAlwaysOnTop) {
+  alwaysOnTopButton.hidden = false;
+  alwaysOnTopButton.onclick = () => {
+    const enabled = alwaysOnTopButton.getAttribute('aria-pressed') !== 'true';
+    window.phoneCamDesktop.setAlwaysOnTop(enabled);
+    alwaysOnTopButton.setAttribute('aria-pressed', String(enabled));
+    alwaysOnTopButton.textContent = enabled ? 'On top ✓' : 'Stay on top';
+  };
+}
 document.querySelectorAll('[data-section]').forEach(button => button.onclick = () => {
   document.querySelectorAll('[data-section]').forEach(item => item.classList.toggle('rail-active', item === button));
   const target = button.dataset.section === 'connect' ? selectedCamera?.card.querySelector('.connect-panel')
@@ -317,17 +454,20 @@ document.querySelectorAll('[data-section]').forEach(button => button.onclick = (
 document.addEventListener('keydown', event => {
   if (!event.ctrlKey || event.altKey || event.metaKey) return;
   const key = event.key.toLowerCase();
-  if (!['s', 'r', 'p', 'n'].includes(key)) return;
+  if (!['s', 'r', 'p', 'n', 'q', 'enter'].includes(key)) return;
   event.preventDefault();
-  if (key === 'n') addCamera();
+  if (key === 'enter') fullscreenButton.click();
+  else if (key === 'n') addCamera();
   else if (selectedCamera && key === 's') snapshot(selectedCamera);
   else if (selectedCamera && key === 'r') toggleRecording(selectedCamera);
   else if (selectedCamera && key === 'p') togglePause(selectedCamera);
+  else if (selectedCamera && key === 'q') discardRecording(selectedCamera);
 });
 window.phoneCamDesktop?.onShortcut(action => {
   if (action === 'new-camera') addCamera();
   else if (selectedCamera && action === 'snapshot') snapshot(selectedCamera);
   else if (selectedCamera && action === 'record') toggleRecording(selectedCamera);
   else if (selectedCamera && action === 'pause') togglePause(selectedCamera);
+  else if (selectedCamera && action === 'discard-recording') discardRecording(selectedCamera);
 });
 addCamera();

@@ -63,6 +63,9 @@ async function createWindow() {
     autoHideMenuBar: true,
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') }
   });
+  ipcMain.on('phonecam-always-on-top', (event, enabled) => {
+    if (event.sender === mainWindow?.webContents) mainWindow.setAlwaysOnTop(Boolean(enabled));
+  });
   if (process.argv.includes('--fullscreen')) mainWindow.setFullScreen(true);
   if (process.argv.includes('--silent')) mainWindow.minimize();
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -76,7 +79,8 @@ async function createWindow() {
     'CommandOrControl+Alt+S': 'snapshot',
     'CommandOrControl+Alt+R': 'record',
     'CommandOrControl+Alt+P': 'pause',
-    'CommandOrControl+Alt+N': 'new-camera'
+    'CommandOrControl+Alt+N': 'new-camera',
+    'CommandOrControl+Alt+Q': 'discard-recording'
   })) globalShortcut.register(key, () => mainWindow?.webContents.send('phonecam-shortcut', action));
 }
 

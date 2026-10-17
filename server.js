@@ -71,9 +71,13 @@ function attachSignaling(server) {
         return;
       }
       const client = clients.get(socket);
-      if (!client || !['offer', 'answer', 'candidate', 'control'].includes(message.type)) return;
-      if (message.type === 'control' && (client.role !== 'viewer' || !['pause', 'switch-camera'].includes(message.action) ||
-          (message.action === 'pause' && typeof message.enabled !== 'boolean'))) return;
+      if (!client || !['offer', 'answer', 'candidate', 'control', 'camera-state'].includes(message.type)) return;
+      if (message.type === 'camera-state' && client.role !== 'phone') return;
+      if (message.type === 'control' && (client.role !== 'viewer' || !['pause', 'switch-camera', 'zoom', 'focus'].includes(message.action) ||
+          (message.action === 'pause' && typeof message.enabled !== 'boolean') ||
+          (message.action === 'zoom' && (!Number.isFinite(message.value) || message.value < 0.1 || message.value > 100)) ||
+          (message.action === 'focus' && (!Number.isFinite(message.x) || !Number.isFinite(message.y) ||
+            message.x < 0 || message.x > 1 || message.y < 0 || message.y > 1)))) return;
       if (JSON.stringify(message).length > 64 * 1024) return;
       const room = rooms.get(client.code);
       const peer = room?.[client.role === 'viewer' ? 'phone' : 'viewer'];

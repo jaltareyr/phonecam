@@ -23,11 +23,34 @@ let stream;
 let code;
 let pendingCandidates = [];
 let preferredFacing = 'environment';
+let reconnectTimer;
+let retryDelay = 1000;
+let reconnectBlocked = false;
 
 function status(message) { statusElement.textContent = message; }
 function signal(message) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
 function closePeer() { peer?.close(); peer = null; pendingCandidates = []; }
 function videoTrack() { return stream?.getVideoTracks()[0]; }
+
+function sendCameraState() {
+  const track = videoTrack();
+  if (!track) return;
+  const caps = track.getCapabilities?.() || {};
+  const settings = track.getSettings();
+  signal({ type: 'camera-state', zoom: caps.zoom ? {
+    min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1,
+    value: settings.zoom || caps.zoom.min
+  } : null, focusSupported: Boolean(caps.pointsOfInterest) });
+}
+
+function retryConnection() {
+  if (!stream || reconnectTimer || reconnectBlocked) return;
+  closePeer();
+  const delay = retryDelay;
+  status(`Reconnecting to PC in ${Math.round(delay / 1000)}s…`);
+  reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, delay);
+  retryDelay = Math.min(delay * 2, 10_000);
+}
 
 async function applyCandidates() {
   while (pendingCandidates.length && peer?.remoteDescription) await peer.addIceCandidate(pendingCandidates.shift());
@@ -35,27 +58,38 @@ async function applyCandidates() {
 
 function makePeer() {
   closePeer();
-  peer = new RTCPeerConnection({ iceServers: [] });
-  peer.onicecandidate = event => { if (event.candidate) signal({ type: 'candidate', candidate: event.candidate }); };
-  peer.onconnectionstatechange = () => {
-    if (peer?.connectionState === 'connected') status('Connected to PC');
-    if (peer && ['failed', 'disconnected'].includes(peer.connectionState)) status('Connection interrupted. Try starting again.');
+  const connection = new RTCPeerConnection({ iceServers: [] });
+  peer = connection;
+  connection.onicecandidate = event => { if (event.candidate) signal({ type: 'candidate', candidate: event.candidate }); };
+  connection.onconnectionstatechange = () => {
+    if (peer !== connection) return;
+    if (connection.connectionState === 'connected') status('Connected to PC');
+    if (connection.connectionState === 'failed') socket?.close();
+    if (connection.connectionState === 'disconnected') {
+      status('Connection interrupted');
+      setTimeout(() => { if (peer === connection && connection.connectionState === 'disconnected') socket?.close(); }, 5000);
+    }
   };
-  for (const track of stream.getTracks()) peer.addTrack(track, stream);
-  return peer;
+  for (const track of stream.getTracks()) connection.addTrack(track, stream);
+  return connection;
 }
 
 function connect() {
   const current = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/signal`);
   socket = current;
-  current.onopen = () => signal({ type: 'join', role: 'phone', code });
+  current.onopen = () => { retryDelay = 1000; signal({ type: 'join', role: 'phone', code }); };
   current.onmessage = async event => {
     const message = JSON.parse(event.data);
     try {
-      if (message.type === 'error') { status(message.message); return; }
+      if (message.type === 'error') {
+        status(message.message);
+        if (message.message.includes('Pairing code unavailable')) { reconnectBlocked = true; current.close(); }
+        return;
+      }
       if (message.type === 'joined') { status('Waiting for PC…'); return; }
       if (message.type === 'paired') {
         status('Pairing…');
+        sendCameraState();
         const pc = makePeer();
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -74,11 +108,26 @@ function connect() {
         return;
       }
       if (message.type === 'control' && message.action === 'switch-camera') { await switchCamera(); return; }
+      if (message.type === 'control' && message.action === 'zoom') {
+        const caps = videoTrack()?.getCapabilities?.();
+        if (caps?.zoom && message.value >= caps.zoom.min && message.value <= caps.zoom.max) {
+          await videoTrack().applyConstraints({ advanced: [{ zoom: message.value }] });
+          showCapabilities();
+          sendCameraState();
+        }
+        return;
+      }
+      if (message.type === 'control' && message.action === 'focus') {
+        if (videoTrack()?.getCapabilities?.().pointsOfInterest) {
+          await videoTrack().applyConstraints({ advanced: [{ pointsOfInterest: [{ x: message.x, y: message.y }], focusMode: 'single-shot' }] });
+        }
+        return;
+      }
       if (message.type === 'peer-left') { closePeer(); status('PC disconnected'); }
     } catch (error) { status(`Connection error: ${error.message}`); }
   };
   current.onerror = () => status('Signaling error');
-  current.onclose = () => { if (socket === current && !peer) status('Server connection closed'); };
+  current.onclose = () => { if (socket === current) retryConnection(); };
 }
 
 async function listCameras() {
@@ -174,6 +223,7 @@ async function switchCamera() {
     await preview.play();
     preferredFacing = nextFacing;
     showCapabilities();
+    sendCameraState();
     await listCameras();
     status(`Switched to ${nextFacing === 'user' ? 'front' : 'rear'} camera`);
   } catch (error) {
@@ -184,6 +234,10 @@ async function switchCamera() {
 
 form.onsubmit = async event => {
   event.preventDefault();
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  retryDelay = 1000;
+  reconnectBlocked = false;
   code = document.getElementById('pair-code').value.toUpperCase().trim();
   if (!/^[A-HJ-NP-Z2-9]{6}$/.test(code)) { status('Enter the six-character code on your PC'); return; }
   try {
@@ -203,6 +257,7 @@ zoom.oninput = async () => {
   zoomValue.textContent = `${Number(zoom.value).toFixed(1)}×`;
   try { await videoTrack().applyConstraints({ advanced: [{ zoom: Number(zoom.value) }] }); }
   catch (error) { status(`Zoom unavailable: ${error.message}`); }
+  sendCameraState();
 };
 focusLock.onchange = async () => {
   try { await videoTrack().applyConstraints({ advanced: [{ focusMode: focusLock.checked ? 'manual' : 'continuous' }] }); }

@@ -15,7 +15,7 @@ On the PC, open `http://localhost:8080/viewer` and note the pairing code. Add ca
 
 ## Windows desktop app
 
-Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.2.0-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.2.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
+Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.3.0-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.3.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
 
 ```powershell
 npm ci
@@ -69,12 +69,13 @@ Native function analysis needs Ghidra 12.1.x and a compatible JDK. Those are not
 | Android video over USB | Working on a connected Android phone with ADB reverse forwarding. |
 | Wi-Fi video | HTTPS signaling and WebRTC path implemented; requires a certificate trusted by Android and has not yet been tested on this phone. |
 | Resolution and frame rate | Requests 480p through 4K and 15 through 240 fps. Actual values depend on camera, browser, USB or Wi-Fi bandwidth, and WebRTC encoding. The phone shows the granted settings. |
-| Camera controls | Front/rear switching from the PC; lens selection and conditional zoom, focus, tap focus, exposure, and flashlight controls on the phone. Browser support varies by phone. |
+| Camera controls | Front/rear switching from the PC; lens selection, zoom and tap focus from the PC when exposed, and conditional focus, exposure, and flashlight controls on the phone. Browser support varies by phone. |
 | Phone microphone | Optional WebRTC audio track and Windows playback; device validation pending. |
 | Multi-camera | Separate simultaneous pairing rooms and Windows previews; second physical phone validation pending. |
-| Effects and orientation | Mirror, 90° rotation, monochrome, warm color, soft focus, and mosaic preview. Snapshots and processed recordings include them. AI person segmentation, background replacement, and face retouching are pending. |
-| Capture | PNG snapshots and WebM/MP4 recording through the browser's MediaRecorder. Unprocessed recording keeps the incoming stream's frame rate; processed recording is captured at 30 fps. |
-| Windows controls | Window, selected-camera shortcuts Ctrl+S/R/P/N, and global shortcuts Ctrl+Alt+S/R/P/N. |
+| Effects and orientation | Mirror, 90° rotation, monochrome, warm color, soft focus, mosaic, brightness, contrast, saturation, hue, and an image overlay. Snapshots, virtual-camera frames, and processed recordings include them. AI person segmentation, background replacement, and face retouching are pending. |
+| Capture | PNG snapshots and WebM/MP4 recording through the browser's MediaRecorder, with discard control. Unprocessed recording keeps the incoming stream's frame rate; processed recording is captured at 30 fps. |
+| Windows controls | Fullscreen, always-on-top in Electron, selected-camera shortcuts Ctrl+S/R/P/N/Q, and global shortcuts Ctrl+Alt+S/R/P/N/Q. |
+| Reconnection | Phone and viewer retry signaling after transport loss; physical-phone interruption and recovery still need validation. |
 | Virtual webcam and microphone devices | The installer registers a native 720p PhoneCam camera and removes it on uninstall; the live frame bridge uses `%ProgramData%\PhoneCam\frame.bin`. Camera visibility and video-call compatibility still require validation after administrator installation. A Windows virtual microphone is pending. |
 
 ## Next milestones

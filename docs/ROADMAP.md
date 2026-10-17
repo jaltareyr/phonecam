@@ -2,7 +2,7 @@
 
 The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEATURE_AUDIT.md). A built component is not counted as complete until its phone-to-Windows acceptance test passes.
 
-## Current baseline (0.2.0)
+## Current baseline (0.3.0)
 
 - [x] Android browser camera capture and WebRTC preview on a physical phone
 - [x] Local pairing server, separate pairing rooms, and signaling test
@@ -11,6 +11,7 @@ The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEA
 - [x] Packaged desktop app, portable EXE, and administrator installer
 - [x] Built native 720p/30 virtual camera source and live frame bridge
 - [x] Basic front/rear switch, browser-dependent controls, mirror/rotate, effects, snapshots, recordings, and shortcuts
+- [x] Desktop color adjustments, image overlay, recording discard, fullscreen, stay-on-top, PC zoom/tap focus signaling, and reconnect retry paths
 - [ ] Install and enumerate PhoneCam virtual camera on this PC
 - [ ] Verify Wi-Fi camera capture with Android trust configured
 - [ ] Verify Windows Camera, Zoom, Teams, OBS, and browser selection
