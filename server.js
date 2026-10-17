@@ -9,8 +9,8 @@ import { ensureCertificates, localIPv4 } from './certificates.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
-const httpPort = Number(process.env.PHONECAM_HTTP_PORT || 8080);
-const httpsPort = Number(process.env.PHONECAM_HTTPS_PORT || 8443);
+const httpPort = Number(process.env.PHONECAM_HTTP_PORT ?? 8080);
+const httpsPort = Number(process.env.PHONECAM_HTTPS_PORT ?? 8443);
 const certDir = process.env.PHONECAM_CERT_DIR || path.join(root, 'certs');
 const { keyPath, certPath } = await ensureCertificates(certDir);
 const rooms = new Map();

@@ -12,7 +12,7 @@ The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEA
 - [x] Built native 720p/30 virtual camera source and live frame bridge
 - [x] Basic front/rear switch, browser-dependent controls, mirror/rotate, effects, snapshots, recordings, and shortcuts
 - [x] Desktop color adjustments, image overlay, recording discard, fullscreen, stay-on-top, PC zoom/tap focus signaling, and reconnect retry paths
-- [ ] Install and enumerate PhoneCam virtual camera on this PC
+- [x] Install and enumerate PhoneCam virtual camera on this PC; capture a frame through Media Foundation
 - [ ] Verify Wi-Fi camera capture with Android trust configured
 - [ ] Verify Windows Camera, Zoom, Teams, OBS, and browser selection
 - [ ] Complete a stable 30-minute USB and Wi-Fi call with measured latency, dropped frames, and reconnect time

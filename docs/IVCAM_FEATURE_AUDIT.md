@@ -20,9 +20,9 @@ Status key: **partial** = some code exists but the full behavior or device valid
 | Connection | Automatic LAN and USB discovery, manual IP, saved PC history, multi-instance target selection | **Missing:** manual URL and code work; no discovery, history, or instance selection. |
 | Pairing and recovery | Clear status, reconnect, bad-network indicator, phone screen-off/background streaming | **Partial:** pairing code, status, and signaling retry; physical recovery unverified. Signal display and phone background mode missing. |
 | Capture modes | 360p through 4K, configurable FPS/quality/encoder, actual-mode display | **Partial:** browser requests 480p–4K and 15–240 fps, displays granted mode; output virtual camera is fixed 720p/30. No bitrate/encoder control. |
-| Virtual video | Selectable Windows camera, multiple output sizes, RGB/YUV choice, one-size-only mode | **Partial:** native camera and installer built; not installed or validated. Only 720p/30 output; no format or mode controls. |
+| Virtual video | Selectable Windows camera, multiple output sizes, RGB/YUV choice, one-size-only mode | **Partial:** installer registered the camera and Media Foundation captured a 720p NV12 frame on this PC. A connected-phone feed and video-call use still need validation. Only 720p/30 output; no format or mode controls. |
 | Virtual audio | Selectable Windows microphone, synchronized phone audio | **Missing:** phone audio reaches desktop playback, but there is no Windows microphone device. Synchronization unverified. |
-| App compatibility | Zoom, Teams, OBS, browsers, Windows Camera | **Unverified:** camera registration awaits an administrator install and consumer tests. |
+| App compatibility | Zoom, Teams, OBS, browsers, Windows Camera | **Partial:** Windows enumerates and opens PhoneCam. Zoom is currently signed out; application-specific live tests remain. |
 | Multiple phones | Independent sessions and virtual camera devices | **Partial:** multiple previews and pairing rooms; one output camera, no second-phone test. |
 | Lenses | Front/rear, ultrawide/telephoto where exposed, smooth switching | **Partial:** front/rear switching and browser device enumeration; physical lens behavior unverified. |
 | Focus and exposure | Tap focus, auto/manual/locked AE/AF/AWB, exposure time, ISO, EV, white balance | **Partial:** browser-dependent PC tap focus and focus/exposure lock; no full modes, ISO, white balance, or PC-side exposure sliders. |
@@ -49,7 +49,7 @@ Status key: **partial** = some code exists but the full behavior or device valid
 
 ## Build gates
 
-1. **Make the existing webcam real:** install the signed or administrator-approved package, enumerate PhoneCam in Windows, test live frames in Windows Camera and Zoom, then USB and Wi-Fi 30-minute calls.
+1. **Verify live webcam use:** pair a phone, test live frames in Windows Camera and Zoom, then USB and Wi-Fi 30-minute calls.
 2. **Finish connection and output:** discovery/reconnect, reliable Wi-Fi trust, dynamic virtual camera modes, independent devices for multiple phones.
 3. **Add virtual microphone and synchronization:** Windows endpoint, audio device selection, drift and echo tests.
 4. **Complete camera controls:** use a native Android app where browser camera APIs cannot deliver ISO, white balance, background capture, or robust lens switching; add iOS separately.

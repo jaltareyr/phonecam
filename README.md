@@ -1,6 +1,6 @@
 # PhoneCam
 
-An independent Android-to-Windows camera app in development. The Android phone captures video and optional microphone audio in its browser; WebRTC sends it directly to a Windows desktop app. The local server handles pairing and signaling. The packaged build includes a native camera source, but Windows camera registration and video-call app compatibility are still unverified.
+An independent Android-to-Windows camera app in development. The Android phone captures video and optional microphone audio in its browser; WebRTC sends it directly to a Windows desktop app. The local server handles pairing and signaling. The Windows 11 installer registers a native virtual camera. Windows registration and frame capture were verified on the development PC on October 17, 2026; a live phone feed in Zoom still needs a final device test.
 
 ## Start
 
@@ -76,11 +76,11 @@ Native function analysis needs Ghidra 12.1.x and a compatible JDK. Those are not
 | Capture | PNG snapshots and WebM/MP4 recording through the browser's MediaRecorder, with discard control. Unprocessed recording keeps the incoming stream's frame rate; processed recording is captured at 30 fps. |
 | Windows controls | Fullscreen, always-on-top in Electron, selected-camera shortcuts Ctrl+S/R/P/N/Q, and global shortcuts Ctrl+Alt+S/R/P/N/Q. |
 | Reconnection | Phone and viewer retry signaling after transport loss; physical-phone interruption and recovery still need validation. |
-| Virtual webcam and microphone devices | The installer registers a native 720p PhoneCam camera and removes it on uninstall; the live frame bridge uses `%ProgramData%\PhoneCam\frame.bin`. Camera visibility and video-call compatibility still require validation after administrator installation. A Windows virtual microphone is pending. |
+| Virtual webcam and microphone devices | The installer registers a native 720p PhoneCam camera and removes it on uninstall; the live frame bridge uses `%ProgramData%\PhoneCam\frame.bin`. Windows enumerated the installed camera and a Media Foundation capture test received 1280×720 NV12 frames. Zoom is installed but currently signed out, so a live Zoom preview is not yet verified. A Windows virtual microphone is pending. |
 
 ## Next milestones
 
-1. Install and validate the PhoneCam virtual camera with administrator approval; test live frames in Windows Camera and a video-call app.
+1. Pair a phone and validate nonblack live frames in the Windows camera and Zoom after signing in to Zoom.
 2. Add AI background segmentation and replacement.
 3. Validate phone audio, multiple physical phones, Wi-Fi pairing, and higher resolutions on devices that support them.
-4. Add virtual microphone support, reconnect handling, and an installer.
+4. Add virtual microphone support and finish device-level reconnect validation.
