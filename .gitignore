@@ -5,6 +5,7 @@ certs/
 __pycache__/
 *.pyc
 release/
+docs/rea-*.json
 native/virtual-camera/packages/
 native/virtual-camera/x64/
 native/virtual-camera/media-source/x64/

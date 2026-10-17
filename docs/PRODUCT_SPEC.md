@@ -2,6 +2,8 @@
 
 Goal: turn an Android phone into a selectable Windows webcam with a simple camera-first desktop client. This specification follows the feature list supplied by the project owner on 2026-10-17. PhoneCam has its own name, artwork, and code.
 
+The owner subsequently requested all iVCam capabilities, including features outside the original 23-point brief. The [complete feature audit](IVCAM_FEATURE_AUDIT.md) is now the scope inventory; this document retains the original build order and acceptance criteria.
+
 ## First release: priorities 1–9
 
 1. Android camera capture and a Windows client that registers a selectable virtual camera.
