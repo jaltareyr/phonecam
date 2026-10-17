@@ -4,11 +4,11 @@ The target is a user-mode Media Foundation software virtual camera, so other Win
 
 Microsoft's MIT-licensed Windows-Camera virtual camera sample is available locally under ignored `tools/Windows-Camera`. Its `SimpleMediaSource` demonstrates synthetic frame production and its installer demonstrates registration. The current sample targets Windows SDK 10.0.26100.0, which is newer than the SDK installed here; it also uses NuGet packages and several project components. We will use it as an API reference while creating a focused PhoneCam source and frame bridge.
 
-Next implementation steps:
+Implemented components and validation steps:
 
-1. Build a minimal COM media source that offers one 1280×720 NV12 or RGB stream at 30 fps and produces a known test pattern.
-2. Register it as a current-user virtual camera and verify visibility in Windows Camera and OBS.
-3. Transfer frames from the desktop receiver to the media source over a local shared-memory or named-pipe boundary, with timestamps and backpressure.
-4. Add install and removal controls, then test after app exit, reconnect, and reboot.
+1. A COM media source offers one 1280×720 NV12 or RGB stream at 30 fps and reads the live frame file.
+2. The installer registers it as an all-users virtual camera; uninstaller removes registration first.
+3. The desktop writes frames to `%ProgramData%\PhoneCam\frame.bin` with sequence and timestamp metadata.
+4. Validate installation, removal, app exit, reconnect, reboot, Windows Camera, and video-call selection.
 
-No virtual camera has been registered by the current build. The native probe only checks API availability.
+The administrator installer must run before PhoneCam appears as a Windows camera. A compiled installer alone does not register it.

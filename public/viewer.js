@@ -222,7 +222,7 @@ async function showConnection(camera) {
     camera.wifiAddress.textContent = preferred?.url || 'No Wi-Fi address found';
     camera.wifiNote.textContent = !info.tlsReady ? 'Wi-Fi setup needs a local HTTPS certificate.'
       : !preferred ? 'Connect this PC to Wi-Fi to show an address.'
-      : !preferred.certificateMatches ? 'The PC address changed. Refresh the local certificate before connecting.'
+      : !preferred.certificateMatches ? 'The PC address changed. PhoneCam is refreshing its Wi-Fi certificate; try again in a minute.'
       : 'Copy address includes the pairing code. Android must trust this PC’s local certificate for camera access.';
     if (preferred && info.certificateAvailable) {
       const link = document.createElement('a');

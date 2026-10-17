@@ -3,8 +3,10 @@
 //
 #include "pch.h"
 #include <algorithm>
+#include <shlobj.h>
+#include <KnownFolders.h>
 
-extern HINSTANCE g_hInst;
+#pragma comment(lib, "Shell32.lib")
 
 namespace {
 constexpr DWORD frameWidth = 1280;
@@ -25,13 +27,12 @@ FrameFile* openFrameFile()
     static HANDLE mapping = nullptr;
     static FrameFile* frame = nullptr;
     if (frame) return frame;
-    WCHAR path[MAX_PATH];
-    if (!g_hInst || !GetModuleFileNameW(g_hInst, path, MAX_PATH)) return nullptr;
-    WCHAR* separator = wcsrchr(path, L'\\');
-    if (!separator) return nullptr;
-    *(separator + 1) = L'\0';
-    if (wcscat_s(path, L"frame.bin") != 0) return nullptr;
-    file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+    PWSTR programData = nullptr;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_ProgramData, 0, nullptr, &programData))) return nullptr;
+    std::wstring path(programData);
+    CoTaskMemFree(programData);
+    path += L"\\PhoneCam\\frame.bin";
+    file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
         nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) return nullptr;
     mapping = CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr);

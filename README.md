@@ -15,14 +15,14 @@ On the PC, open `http://localhost:8080/viewer` and note the pairing code. Add ca
 
 ## Windows desktop app
 
-Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. To rebuild from source with Node 22.12+ on `PATH`:
+Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. For installation on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.2.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
 
 ```powershell
 npm ci
-npm run package:win
+npm run installer:win
 ```
 
-On this computer, Node 24 is available at `C:\Users\Yashodhan Jaltare\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`. The source development command is `npm run desktop` when that runtime is on `PATH`.
+On this computer, Node 24 is available at `C:\Users\Yashodhan Jaltare\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`. Building the installer also requires Inno Setup 6 and Visual Studio C++ Build Tools for the native camera binaries. The source development command is `npm run desktop` when the Node runtime is on `PATH`.
 
 ### Android via USB
 
@@ -39,7 +39,7 @@ Choose the requested resolution and frame rate before pressing **Start camera**.
 
 ### Android via Wi-Fi
 
-In the Windows app, choose **Wi-Fi** in the right panel. It shows this PC's LAN address and a **Copy address** button that includes the pairing code. Both devices must be on the same network. The packaged build on this PC includes a local certificate for its current Wi-Fi address. If the address changes, create a new certificate with the new IP and repackage the app:
+In the Windows app, choose **Wi-Fi** in the right panel. It shows this PC's LAN address and a **Copy address** button that includes the pairing code. Both devices must be on the same network. On first launch, PhoneCam generates a distinct local CA and server certificate in `%LOCALAPPDATA%\PhoneCam\certs`; no private key is included in the installer. It renews the server certificate when a new Wi-Fi IP appears. For standalone development, certificates are generated in the ignored `certs/` folder. The old Python generator remains available for manual testing:
 
 ```powershell
 python -m pip install cryptography
@@ -47,7 +47,7 @@ python scripts/make_cert.py --ip 192.168.1.10
 npm start
 ```
 
-Use the actual address shown in the Windows app in place of the example IP. Open the address in Android Chrome and start the camera. Android must trust the local certificate authority for camera access; simply bypassing a certificate warning may leave Chrome without a secure context. The Wi-Fi panel links to the CA certificate, and the phone page shows the same download if camera access is blocked. Install it using Android's **Install a CA certificate** setting, then reopen the phone page. Only install the certificate generated on your own PC. The packaged server key and certificate are specific to this PC and should not be shared. The CA private key stays in the source `certs/` folder and is never packaged. Source certificate files stay in `certs/` and are ignored by Git.
+Use the actual address shown in the Windows app in place of the example IP. Open the address in Android Chrome and start the camera. Android must trust the local certificate authority for camera access; simply bypassing a certificate warning may leave Chrome without a secure context. The Wi-Fi panel links to the CA certificate, and the phone page shows the same download if camera access is blocked. Install it using Android's **Install a CA certificate** setting, then reopen the phone page. Only install the certificate generated on your own PC. The CA private key stays in local app data and is never packaged. Uninstall leaves each user's certificate files in local app data; the user may delete that folder after removing the CA trust on Android.
 
 ## Architecture
 
@@ -74,11 +74,11 @@ Native function analysis needs Ghidra 12.1.x and a compatible JDK. Those are not
 | Effects and orientation | Mirror, 90° rotation, monochrome, warm color, soft focus, and mosaic preview. Snapshots and processed recordings include them. AI person segmentation, background replacement, and face retouching are pending. |
 | Capture | PNG snapshots and WebM/MP4 recording through the browser's MediaRecorder. Unprocessed recording keeps the incoming stream's frame rate; processed recording is captured at 30 fps. |
 | Windows controls | Window, selected-camera shortcuts Ctrl+S/R/P/N, and global shortcuts Ctrl+Alt+S/R/P/N. |
-| Virtual webcam and microphone devices | A native 720p PhoneCam media source and live frame bridge now build and ship with the desktop package. Windows camera registration and app compatibility are still unverified because the required administrator UAC prompt was canceled. A Windows virtual microphone is pending. |
+| Virtual webcam and microphone devices | The installer registers a native 720p PhoneCam camera and removes it on uninstall; the live frame bridge uses `%ProgramData%\PhoneCam\frame.bin`. Camera visibility and video-call compatibility still require validation after administrator installation. A Windows virtual microphone is pending. |
 
 ## Next milestones
 
-1. Register and validate the PhoneCam virtual camera with administrator approval; test live frames in Windows Camera and a video-call app.
+1. Install and validate the PhoneCam virtual camera with administrator approval; test live frames in Windows Camera and a video-call app.
 2. Add AI background segmentation and replacement.
 3. Validate phone audio, multiple physical phones, Wi-Fi pairing, and higher resolutions on devices that support them.
 4. Add virtual microphone support, reconnect handling, and an installer.

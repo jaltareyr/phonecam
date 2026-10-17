@@ -1,6 +1,6 @@
 {
   "name": "phonecam",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "desktop/main.cjs",
@@ -8,9 +8,12 @@
     "start": "node server.js",
     "desktop": "electron .",
     "package:win": "node scripts/package-desktop.mjs",
+    "installer:win": "node scripts/build-installer.mjs",
     "test": "node --test"
   },
   "dependencies": {
+    "@peculiar/x509": "^2.2.0",
+    "reflect-metadata": "^0.2.2",
     "ws": "^8.18.3"
   },
   "devDependencies": {

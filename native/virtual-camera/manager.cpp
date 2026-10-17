@@ -58,7 +58,7 @@ HRESULT registerSource() {
 HRESULT updateCamera(bool remove) {
     IMFVirtualCamera* camera = nullptr;
     HRESULT hr = MFCreateVirtualCamera(MFVirtualCameraType_SoftwareCameraSource,
-        MFVirtualCameraLifetime_System, MFVirtualCameraAccess_CurrentUser,
+        MFVirtualCameraLifetime_System, MFVirtualCameraAccess_AllUsers,
         cameraName, sourceId, nullptr, 0, &camera);
     if (FAILED(hr)) return hr;
     hr = remove ? camera->Remove() : camera->Start(nullptr);

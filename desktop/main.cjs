@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 const { openFrameStore, PIXEL_BYTES } = require('./frame-store.cjs');
 
 const baseUrl = 'http://127.0.0.1:8080';
@@ -9,10 +10,10 @@ let mainWindow = null;
 let frameStore = null;
 
 function openFrameFile() {
-  const nativeDir = app.isPackaged
-    ? path.join(path.dirname(process.execPath), 'native')
-    : path.join(app.getAppPath(), 'native', 'virtual-camera', 'x64', 'Release');
-  frameStore = openFrameStore(nativeDir);
+  const programData = process.env.ProgramData || 'C:\\ProgramData';
+  const frameDir = path.join(programData, 'PhoneCam');
+  fs.mkdirSync(frameDir, { recursive: true });
+  frameStore = openFrameStore(frameDir);
   ipcMain.on('phonecam-frame', (event, data) => {
     if (event.sender !== mainWindow?.webContents) return;
     if (data?.byteLength === PIXEL_BYTES) frameStore.writeFrame(data);
@@ -34,9 +35,10 @@ async function serverIsReady() {
 async function ensureServer() {
   if (await serverIsReady()) return;
   const script = path.join(app.getAppPath(), 'server.js');
+  const localData = process.env.LOCALAPPDATA || app.getPath('userData');
   serverProcess = spawn(process.execPath, [script], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1',
-      PHONECAM_CERT_DIR: app.isPackaged ? path.join(path.dirname(process.execPath), 'certs') : path.join(app.getAppPath(), 'certs') },
+      PHONECAM_CERT_DIR: path.join(localData, 'PhoneCam', 'certs') },
     windowsHide: true,
     stdio: 'ignore'
   });

@@ -3,15 +3,16 @@ import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
+import { ensureCertificates, localIPv4 } from './certificates.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
 const httpPort = Number(process.env.PHONECAM_HTTP_PORT || 8080);
 const httpsPort = Number(process.env.PHONECAM_HTTPS_PORT || 8443);
 const certDir = process.env.PHONECAM_CERT_DIR || path.join(root, 'certs');
+const { keyPath, certPath } = await ensureCertificates(certDir);
 const rooms = new Map();
 const clients = new Map();
 const codePattern = /^[A-HJ-NP-Z2-9]{6}$/;
@@ -86,10 +87,7 @@ function attachSignaling(server) {
 function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   if (url.pathname === '/api/connectivity' && req.method === 'GET') {
-    const addresses = Object.values(os.networkInterfaces()).flatMap(values => values || [])
-      .filter(address => address.family === 'IPv4' && !address.internal &&
-        !address.address.startsWith('169.254.') && !address.address.startsWith('172.29.'))
-      .map(address => address.address);
+    const addresses = localIPv4();
     const tlsReady = fs.existsSync(keyPath) && fs.existsSync(certPath);
     const certificate = tlsReady ? new crypto.X509Certificate(fs.readFileSync(certPath)) : null;
     const wifi = addresses.map(address => ({
@@ -137,18 +135,19 @@ httpServer.listen(httpPort, '127.0.0.1', () => {
   console.log(`Android USB: adb reverse tcp:${httpPort} tcp:${httpPort}, then open http://localhost:${httpPort}/phone on the phone`);
 });
 
-const keyPath = path.join(certDir, 'server-key.pem');
-const certPath = path.join(certDir, 'server-cert.pem');
-if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
-  const httpsServer = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, handleRequest);
-  attachSignaling(httpsServer);
-  httpsServer.listen(httpsPort, '0.0.0.0', () => {
-    for (const values of Object.values(os.networkInterfaces())) {
-      for (const address of values || []) {
-        if (address.family === 'IPv4' && !address.internal) console.log(`Wi-Fi phone: https://${address.address}:${httpsPort}/phone`);
-      }
+const httpsServer = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, handleRequest);
+attachSignaling(httpsServer);
+httpsServer.listen(httpsPort, '0.0.0.0', () => {
+  for (const address of localIPv4()) console.log(`Wi-Fi phone: https://${address}:${httpsPort}/phone`);
+});
+let certificateModified = fs.statSync(certPath).mtimeMs;
+setInterval(async () => {
+  try {
+    await ensureCertificates(certDir);
+    const modified = fs.statSync(certPath).mtimeMs;
+    if (modified !== certificateModified) {
+      httpsServer.setSecureContext({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) });
+      certificateModified = modified;
     }
-  });
-} else {
-  console.log('Wi-Fi HTTPS disabled: run python scripts/make_cert.py to create a local certificate.');
-}
+  } catch (error) { console.error(`Could not refresh Wi-Fi certificate: ${error.message}`); }
+}, 60_000).unref();
