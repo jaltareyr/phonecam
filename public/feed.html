@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhoneCam feed</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-role="feed">
+  <main id="feed-stage" class="feed-stage">
+    <div class="feed-toolbar">
+      <strong>PhoneCam feed</strong>
+      <button id="feed-fit" type="button" class="secondary">Fill screen</button>
+      <button id="feed-fullscreen" type="button" class="secondary">Fullscreen</button>
+      <button id="feed-close" type="button" class="secondary">Close</button>
+    </div>
+    <canvas id="feed-canvas" width="1280" height="720" aria-label="Selected PhoneCam camera feed"></canvas>
+  </main>
+  <p id="feed-hint" class="feed-hint">Waiting for the selected camera feed…</p>
+  <script type="module" src="/feed.js"></script>
+</body>
+</html>

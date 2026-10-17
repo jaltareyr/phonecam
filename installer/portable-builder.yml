@@ -5,5 +5,6 @@ directories:
 artifactName: PhoneCam-Portable-${version}-x64.${ext}
 win:
   target: portable
+  icon: assets/phonecam.ico
   signAndEditExecutable: false
 publish: null

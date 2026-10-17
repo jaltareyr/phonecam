@@ -15,7 +15,7 @@ On the PC, open `http://localhost:8080/viewer` and note the pairing code. Add ca
 
 ## Windows desktop app
 
-Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.3.1-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.3.1-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
+Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.4.0-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.4.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
 
 ```powershell
 npm ci
@@ -38,11 +38,11 @@ On the phone, open `http://localhost:8080/phone` in Chrome. Enter the code, choo
 
 Choose the requested resolution and frame rate before pressing **Start camera**. The phone page shows the actual settings granted by Android and Chrome. Zoom, focus, exposure, and flashlight controls appear only when the browser exposes them for that camera. **Switch camera** in the Windows app changes front/rear camera in the existing connection where Android supports both; use the phone's camera selector and **Start camera** to choose a specific lens or change quality. Enable **Send phone microphone** to include audio, then press **Unmute** in the Windows app to hear it.
 
-If Android reports that it could not start the camera source, PhoneCam 0.3.1 retries at 480p/15 fps with the selected and alternate lenses. If all attempts fail, check Android's Camera access toggle and Chrome camera permission, close any other Chrome camera tabs, then restart Chrome. This error occurs before pairing or Zoom receives video.
+If Android reports that it could not start the camera source, PhoneCam 0.3.1 retries at 480p/15 fps with the selected and alternate lenses. On the tested Samsung phone, Android's camera service showed that another Chrome tab already held the camera; force stopping Chrome and reopening one PhoneCam tab resolved it. If all attempts fail, check Android's Camera access toggle and Chrome camera permission, close camera tabs, then restart Chrome. This error occurs before pairing or Zoom receives video.
 
 ### Android via Wi-Fi
 
-In the Windows app, choose **Wi-Fi** in the right panel. It shows this PC's LAN address and a **Copy address** button that includes the pairing code. Both devices must be on the same network. On first launch, PhoneCam generates a distinct local CA and server certificate in `%LOCALAPPDATA%\PhoneCam\certs`; no private key is included in the installer. It renews the server certificate when a new Wi-Fi IP appears. For standalone development, certificates are generated in the ignored `certs/` folder. The old Python generator remains available for manual testing:
+In the Windows app, click the connection status at the bottom left to open the pairing dialog, then choose **Wi-Fi**. It shows this PC's LAN address and a **Copy address** button that includes the pairing code. Both devices must be on the same network. On first launch, PhoneCam generates a distinct local CA and server certificate in `%LOCALAPPDATA%\PhoneCam\certs`; no private key is included in the installer. It renews the server certificate when a new Wi-Fi IP appears. For standalone development, certificates are generated in the ignored `certs/` folder. The old Python generator remains available for manual testing:
 
 ```powershell
 python -m pip install cryptography
@@ -69,20 +69,20 @@ Native function analysis needs Ghidra 12.1.x and a compatible JDK. Those are not
 | Feature | Current state |
 | --- | --- |
 | Android video over USB | Working on a connected Android phone with ADB reverse forwarding. |
-| Wi-Fi video | HTTPS signaling and WebRTC path implemented; requires a certificate trusted by Android and has not yet been tested on this phone. |
+| Wi-Fi video | Confirmed on the connected Android phone: HTTPS pairing and WebRTC delivered live video to the Windows preview. Android must trust the local certificate. Long-call stability remains untested. |
 | Resolution and frame rate | Requests 480p through 4K and 15 through 240 fps. Actual values depend on camera, browser, USB or Wi-Fi bandwidth, and WebRTC encoding. The phone shows the granted settings. |
 | Camera controls | Front/rear switching from the PC; lens selection, zoom and tap focus from the PC when exposed, and conditional focus, exposure, and flashlight controls on the phone. Browser support varies by phone. |
 | Phone microphone | Optional WebRTC audio track and Windows playback; device validation pending. |
 | Multi-camera | Separate simultaneous pairing rooms and Windows previews; second physical phone validation pending. |
 | Effects and orientation | Mirror, 90° rotation, monochrome, warm color, soft focus, mosaic, brightness, contrast, saturation, hue, and an image overlay. Snapshots, virtual-camera frames, and processed recordings include them. AI person segmentation, background replacement, and face retouching are pending. |
 | Capture | PNG snapshots and WebM/MP4 recording through the browser's MediaRecorder, with discard control. Unprocessed recording keeps the incoming stream's frame rate; processed recording is captured at 30 fps. |
-| Windows controls | Fullscreen, always-on-top in Electron, selected-camera shortcuts Ctrl+S/R/P/N/Q, and global shortcuts Ctrl+Alt+S/R/P/N/Q. |
+| Windows controls | Video-first window with bottom snapshot, record, settings, and options controls. The menu opens a separate feed window, feed-only fullscreen, and always-on-top in Electron. Browser mode opens a feed tab. Selected-camera shortcuts Ctrl+S/R/P/N/Q and global shortcuts Ctrl+Alt+S/R/P/N/Q remain available. |
 | Reconnection | Phone and viewer retry signaling after transport loss; physical-phone interruption and recovery still need validation. |
-| Virtual webcam and microphone devices | The installer registers a native 720p PhoneCam camera and removes it on uninstall; the live frame bridge uses `%ProgramData%\PhoneCam\frame.bin`. Windows enumerated the installed camera and a Media Foundation capture test received 1280×720 NV12 frames. Zoom is installed but currently signed out, so a live Zoom preview is not yet verified. A Windows virtual microphone is pending. |
+| Virtual webcam and microphone devices | The installer registers a native 720p PhoneCam camera and removes it on uninstall; the live frame bridge uses `%ProgramData%\PhoneCam\frame.bin`. Windows enumerated the installed camera, and a Media Foundation capture test received nonblack 1280×720 NV12 frames from the live Android feed. Zoom is installed but currently signed out, so a live Zoom preview is not yet verified. A Windows virtual microphone is pending. |
 
 ## Next milestones
 
-1. Pair a phone and validate nonblack live frames in the Windows camera and Zoom after signing in to Zoom.
+1. Validate the live feed in Windows Camera and Zoom after signing in to Zoom.
 2. Add AI background segmentation and replacement.
 3. Validate phone audio, multiple physical phones, Wi-Fi pairing, and higher resolutions on devices that support them.
 4. Add virtual microphone support and finish device-level reconnect validation.

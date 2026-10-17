@@ -11,6 +11,7 @@ DefaultDirName={autopf}\PhoneCam
 DefaultGroupName=PhoneCam
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\PhoneCam.exe
+SetupIconFile=..\assets\phonecam.ico
 OutputDir=..\release\installer
 OutputBaseFilename=PhoneCam-Setup-{#AppVersion}-x64
 Compression=lzma2

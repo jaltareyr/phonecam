@@ -17,6 +17,7 @@ const outputs = await packager({
   arch: 'x64',
   appVersion: packageInfo.version,
   executableName: 'PhoneCam',
+  icon: path.join(root, 'assets', 'phonecam.ico'),
   overwrite: true,
   asar: true,
   prune: true,

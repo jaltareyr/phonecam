@@ -124,7 +124,7 @@ function handleRequest(req, res) {
     res.end(JSON.stringify({ ok: true, app: 'phonecam' }));
     return;
   }
-  const routes = { '/': 'viewer.html', '/viewer': 'viewer.html', '/phone': 'phone.html', '/viewer.js': 'viewer.js', '/phone.js': 'phone.js', '/style.css': 'style.css' };
+  const routes = { '/': 'viewer.html', '/viewer': 'viewer.html', '/phone': 'phone.html', '/feed': 'feed.html', '/viewer.js': 'viewer.js', '/phone.js': 'phone.js', '/feed.js': 'feed.js', '/style.css': 'style.css' };
   const name = routes[url.pathname];
   if (!name || req.method !== 'GET') { res.writeHead(404); res.end('Not found'); return; }
   const type = name.endsWith('.html') ? 'text/html; charset=utf-8' : name.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8';

@@ -7,6 +7,7 @@ const { openFrameStore, PIXEL_BYTES } = require('./frame-store.cjs');
 const baseUrl = 'http://127.0.0.1:8080';
 let serverProcess = null;
 let mainWindow = null;
+let feedWindow = null;
 let frameStore = null;
 
 function openFrameFile() {
@@ -16,11 +17,44 @@ function openFrameFile() {
   frameStore = openFrameStore(frameDir);
   ipcMain.on('phonecam-frame', (event, data) => {
     if (event.sender !== mainWindow?.webContents) return;
-    if (data?.byteLength === PIXEL_BYTES) frameStore.writeFrame(data);
+    if (data?.byteLength === PIXEL_BYTES) {
+      frameStore.writeFrame(data);
+      if (feedWindow && !feedWindow.isDestroyed()) feedWindow.webContents.send('phonecam-feed-frame', data);
+    }
   });
   ipcMain.on('phonecam-clear-frame', event => {
-    if (event.sender === mainWindow?.webContents) frameStore.clear();
+    if (event.sender === mainWindow?.webContents) {
+      frameStore.clear();
+      if (feedWindow && !feedWindow.isDestroyed()) feedWindow.webContents.send('phonecam-feed-frame', null);
+    }
   });
+}
+
+function openFeedWindow() {
+  if (feedWindow && !feedWindow.isDestroyed()) {
+    feedWindow.focus();
+    return;
+  }
+  feedWindow = new BrowserWindow({
+    width: 960,
+    height: 620,
+    minWidth: 400,
+    minHeight: 300,
+    title: 'PhoneCam feed',
+    backgroundColor: '#000000',
+    autoHideMenuBar: true,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true,
+      preload: path.join(__dirname, 'preload.cjs') }
+  });
+  feedWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  wireFullscreenState(feedWindow);
+  feedWindow.on('closed', () => { feedWindow = null; });
+  feedWindow.loadURL(`${baseUrl}/feed`);
+}
+
+function wireFullscreenState(window) {
+  window.on('enter-full-screen', () => window.webContents.send('phonecam-fullscreen-state', true));
+  window.on('leave-full-screen', () => window.webContents.send('phonecam-fullscreen-state', false));
 }
 
 async function serverIsReady() {
@@ -66,9 +100,18 @@ async function createWindow() {
   ipcMain.on('phonecam-always-on-top', (event, enabled) => {
     if (event.sender === mainWindow?.webContents) mainWindow.setAlwaysOnTop(Boolean(enabled));
   });
+  ipcMain.on('phonecam-open-feed-window', event => {
+    if (event.sender === mainWindow?.webContents) openFeedWindow();
+  });
+  ipcMain.on('phonecam-toggle-fullscreen', event => {
+    const target = event.sender === mainWindow?.webContents ? mainWindow
+      : event.sender === feedWindow?.webContents ? feedWindow : null;
+    if (target) target.setFullScreen(!target.isFullScreen());
+  });
   if (process.argv.includes('--fullscreen')) mainWindow.setFullScreen(true);
   if (process.argv.includes('--silent')) mainWindow.minimize();
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  wireFullscreenState(mainWindow);
   mainWindow.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith(`${baseUrl}/`)) event.preventDefault();
   });
@@ -92,6 +135,7 @@ app.whenReady().then(createWindow).catch(error => {
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
   globalShortcut.unregisterAll();
+  if (feedWindow && !feedWindow.isDestroyed()) feedWindow.close();
   frameStore?.close();
   if (serverProcess && serverProcess.exitCode === null) serverProcess.kill();
 });

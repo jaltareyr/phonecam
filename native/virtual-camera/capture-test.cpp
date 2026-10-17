@@ -62,7 +62,12 @@ int wmain() {
             }
             std::wcout << L"PhoneCam frame received: " << length << L" bytes, flags "
                        << flags << L", sampled checksum " << checksum
-                       << L", lit samples " << litPixels << L'\n';
+                       << L", lit samples " << litPixels;
+            if (length == 1280 * 720 * 3 / 2)
+                std::wcout << L", first NV12 YUV " << static_cast<unsigned>(data[0])
+                           << L"," << static_cast<unsigned>(data[1280 * 720])
+                           << L"," << static_cast<unsigned>(data[1280 * 720 + 1]);
+            std::wcout << L'\n';
             buffer->Unlock();
         }
     }

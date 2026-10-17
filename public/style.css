@@ -72,3 +72,81 @@ body[data-role=viewer] .wifi-note a{color:#238dd0;line-height:2}
 body[data-role=phone] #certificate-help a{color:#75d9d1}
 @media(max-width:1000px){body[data-role=viewer] .connect-panel{border-left:0;border-top:1px solid #dce6ec}}
 body[data-role=viewer] .color-panel{border-color:#dce6ec;color:#557084}body[data-role=viewer] .color-panel summary{color:#37586f}body[data-role=viewer] .color-panel button{background:#e3f2fb;color:#207ab2}body[data-role=viewer] .overlay-file{background:#fff;border-color:#cddde8;color:#344655}body[data-role=viewer] .pc-zoom{color:#597286}body[data-role=viewer] .focus-hint{color:#7c94a4}body[data-role=viewer] .header-actions button.secondary{background:#e7f3fb;color:#267fb7}body[data-role=viewer] .header-actions button.secondary:hover{background:#d5eafa}
+body[data-role=viewer] .preview-actions{display:flex;align-items:center;gap:8px}
+body[data-role=viewer] .preview-actions .popout-feed{font-size:11px;padding:7px 10px;background:#e3f2fb;color:#207ab2}
+body[data-role=viewer] .preview-shell .exit-feed-fullscreen{display:none}
+body[data-role=viewer] .preview-shell:fullscreen{display:flex;align-items:center;justify-content:center;width:100vw;height:100vh;margin:0;background:#000}
+body[data-role=viewer] .preview-shell:fullscreen .preview{width:100vw!important;height:100vh!important;max-height:100vh;object-fit:contain;aspect-ratio:auto!important;border:0;border-radius:0;background:#000}
+body[data-role=viewer] .preview-shell:fullscreen .exit-feed-fullscreen{display:block;position:absolute;top:20px;right:20px;z-index:2;background:#17232acc;color:#fff;padding:10px 14px}
+body[data-role=feed]{margin:0;background:#000;color:#fff;overflow:hidden}
+body[data-role=feed] .feed-toolbar{position:absolute;top:12px;left:12px;right:12px;z-index:2;display:flex;align-items:center;gap:8px;padding:8px 10px;background:#10171dcc;border-radius:8px;width:max-content;max-width:calc(100% - 24px)}
+body[data-role=feed] .feed-toolbar strong{font-size:13px;margin-right:8px}
+body[data-role=feed] .feed-toolbar button{font-size:12px;padding:7px 10px}
+body[data-role=feed] .feed-stage{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center}
+body[data-role=feed] .feed-stage canvas{width:100vw;height:100vh;object-fit:contain;background:#000}
+body[data-role=feed] .feed-stage.cover canvas{object-fit:cover}
+body[data-role=feed] .feed-hint{position:absolute;bottom:20px;left:20px;padding:8px 10px;background:#10171dcc;border-radius:6px;font-size:12px}
+body[data-role=feed] .feed-stage:fullscreen{background:#000}
+
+/* Compact Windows client: the selected feed owns the window, controls live in the bottom bar. */
+body[data-role=viewer]{overflow:hidden;background:#303337}
+body[data-role=viewer] .desktop-app{height:100vh;min-height:0}
+body[data-role=viewer] .app-header,body[data-role=viewer] .left-rail,body[data-role=viewer] .workspace-heading,body[data-role=viewer] .workspace .hint{display:none}
+body[data-role=viewer] .app-body{height:calc(100vh - 56px);min-height:0}
+body[data-role=viewer] .workspace{height:100%;padding:0}
+body[data-role=viewer] .camera-grid{height:100%;display:block}
+body[data-role=viewer] .camera-card{height:100%;border:0;border-radius:0;box-shadow:none;overflow:visible;background:#303337}
+body[data-role=viewer] .camera-card:not(.selected){display:none}
+body[data-role=viewer] .camera-card.selected{border:0;box-shadow:none}
+body[data-role=viewer] .camera-layout,body[data-role=viewer] .video-column{display:block;width:100%;height:100%;min-width:0}
+body[data-role=viewer] .video-column{padding:0}
+body[data-role=viewer] .preview-heading,body[data-role=viewer] .camera-state,body[data-role=viewer] .capture-bar{display:none}
+body[data-role=viewer] .preview-shell{height:100%;margin:0;display:flex;align-items:center;justify-content:center;background:#303337}
+body[data-role=viewer] .preview-shell .preview{display:block;width:100%;height:100%;border:0;border-radius:0;object-fit:contain;background:#303337}
+body[data-role=viewer] .empty-state{inset:0;border-radius:0;background:radial-gradient(circle at 50% 42%,#393e44,#24282d 75%);color:#b8c5ce}
+body[data-role=viewer] .empty-state strong{color:#fff;font-size:18px}
+body[data-role=viewer] .empty-state .connection-art{color:#56b4e8}
+body[data-role=viewer] .studio-toolbar{position:relative;z-index:30;height:56px;background:#fff;border-top:1px solid #d7dce0;display:flex;align-items:center;justify-content:space-between;padding:0 15px;color:#59636b}
+body[data-role=viewer] .studio-toolbar button{border:0;border-radius:4px;background:transparent;color:#66747f;cursor:pointer}
+body[data-role=viewer] .studio-toolbar button:hover,body[data-role=viewer] .studio-toolbar button[aria-expanded=true]{background:#e7f3fb;color:#2388c8}
+body[data-role=viewer] .toolbar-status{display:flex;align-items:center;gap:10px;padding:8px 6px;font-size:13px;font-weight:500;min-width:0}
+body[data-role=viewer] .toolbar-status-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body[data-role=viewer] .toolbar-wifi{font-size:21px;color:#249ade}
+body[data-role=viewer] .studio-actions{display:flex;align-items:center;gap:10px}
+body[data-role=viewer] .studio-actions button{width:39px;height:39px;display:grid;place-items:center;padding:0;font-size:24px;font-weight:600}
+body[data-role=viewer] .studio-actions button:disabled{opacity:.35;cursor:not-allowed}
+body[data-role=viewer] .studio-actions .record-glyph{font-size:18px;color:#71808a}
+body[data-role=viewer] .studio-actions .is-recording .record-glyph{color:#d94b51;animation:phonecam-pulse 1s infinite alternate}
+@keyframes phonecam-pulse{from{opacity:1}to{opacity:.35}}
+body[data-role=viewer] .panel-scrim{position:fixed;inset:0;z-index:20;background:#08131a45}
+body[data-role=viewer] .panel-scrim[hidden],body[data-role=viewer] .studio-menu[hidden]{display:none}
+body[data-role=viewer] .studio-menu{position:fixed;right:12px;bottom:56px;width:226px;z-index:40;padding:7px 0;background:#fff;color:#273847;border:1px solid #cbd5dc;box-shadow:0 7px 25px #0003;border-radius:7px}
+body[data-role=viewer] .studio-menu button{display:block;width:100%;background:transparent;color:#2b3e4d;text-align:left;padding:9px 15px;font-size:13px;border-radius:0;font-weight:500}
+body[data-role=viewer] .studio-menu button:hover{background:#e7f3fb;color:#176d9f}
+body[data-role=viewer] .studio-menu button[hidden]{display:none}
+body[data-role=viewer] .studio-menu button:nth-child(4),body[data-role=viewer] .studio-menu button:nth-child(8){border-top:1px solid #e5ebef}
+body[data-role=viewer] .studio-menu span{float:right;color:#8999a5}
+body[data-role=viewer] .control-panel,body[data-role=viewer] .connect-panel{display:none;position:fixed;z-index:25;top:50%;left:50%;transform:translate(-50%,-50%);max-height:calc(100vh - 90px);overflow:auto;width:min(480px,calc(100vw - 30px));background:#f5f7f9;border:1px solid #cfd8de;border-radius:9px;box-shadow:0 14px 45px #0005;padding:22px;color:#344655}
+body[data-role=viewer].settings-open .camera-card.selected .control-panel,body[data-role=viewer].connect-open .camera-card.selected .connect-panel{display:block}
+body[data-role=viewer] .control-panel .panel-title,body[data-role=viewer] .connect-panel .panel-title{font-size:16px;margin-bottom:20px}
+body[data-role=viewer] .panel-close{float:right;margin:-10px -8px 0 0;padding:2px 9px;font-size:24px;line-height:1;background:transparent;color:#768897}
+body[data-role=viewer] .panel-close:hover{background:#e0eaf0}
+body[data-role=viewer] .control-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+body[data-role=viewer] .control-grid button{min-height:54px}
+body[data-role=viewer] .connect-panel .mode-tabs{margin-bottom:17px}
+body[data-role=viewer] .connect-panel .step{margin-bottom:13px}
+body[data-role=viewer] .connect-panel .code-step{padding-top:12px}
+body[data-role=viewer] .preview-shell:fullscreen{z-index:50}
+@media(max-width:600px){body[data-role=viewer] .studio-actions{gap:2px}body[data-role=viewer] .studio-actions button{width:34px}body[data-role=viewer] .toolbar-status{font-size:11px}body[data-role=viewer] .control-grid{grid-template-columns:repeat(2,1fr)}}
+body[data-role=viewer].desktop-fullscreen .studio-toolbar{display:none}
+body[data-role=viewer].desktop-fullscreen .app-body{height:100vh}
+body[data-role=viewer].desktop-fullscreen .preview-shell .exit-feed-fullscreen{display:block;position:absolute;top:18px;right:18px;z-index:2;background:#18232dcc;color:#fff;padding:9px 12px;font-size:12px}
+body[data-role=feed].desktop-fullscreen .feed-toolbar{right:14px;left:auto;width:auto;background:transparent}
+body[data-role=feed].desktop-fullscreen .feed-toolbar strong,body[data-role=feed].desktop-fullscreen #feed-fit,body[data-role=feed].desktop-fullscreen #feed-close{display:none}
+body[data-role=feed].desktop-fullscreen .feed-hint{display:none}
+body[data-role=viewer] #toolbar-snapshot{position:relative;font-size:0}
+body[data-role=viewer] #toolbar-snapshot:before{content:"";display:block;width:21px;height:15px;border:2px solid currentColor;border-radius:3px}
+body[data-role=viewer] #toolbar-snapshot:after{content:"";position:absolute;width:7px;height:7px;border:2px solid currentColor;border-radius:50%;top:13px;left:14px}
+body[data-role=viewer] #toolbar-record .record-glyph{position:relative;display:block;width:20px;height:15px;border-radius:3px;background:currentColor;font-size:0}
+body[data-role=viewer] #toolbar-record .record-glyph:after{content:"";position:absolute;left:22px;top:2px;border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:7px solid currentColor}
+body[data-role=viewer] #toolbar-record.is-recording .record-glyph{background:#d94b51;color:#d94b51}

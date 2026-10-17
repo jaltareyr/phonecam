@@ -8,7 +8,9 @@ const PIXEL_BYTES = WIDTH * HEIGHT * 4;
 function openFrameStore(directory) {
   fs.mkdirSync(directory, { recursive: true });
   const filePath = path.join(directory, 'frame.bin');
-  const fd = fs.openSync(filePath, 'w+');
+  // A camera consumer may keep this file mapped after a previous app run.
+  // Opening with w+ truncates immediately and fails on Windows in that case.
+  const fd = fs.openSync(filePath, fs.existsSync(filePath) ? 'r+' : 'w+');
   fs.ftruncateSync(fd, 16 + PIXEL_BYTES);
   let sequence = 0;
   let closed = false;

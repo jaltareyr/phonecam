@@ -1,6 +1,44 @@
 const grid = document.getElementById('streams');
 const cameras = new Set();
 let selectedCamera = null;
+const menu = document.getElementById('studio-menu');
+const scrim = document.getElementById('panel-scrim');
+const toolbarSnapshot = document.getElementById('toolbar-snapshot');
+const toolbarRecord = document.getElementById('toolbar-record');
+const toolbarSettings = document.getElementById('toolbar-settings');
+const toolbarMenu = document.getElementById('toolbar-menu');
+window.phoneCamSelectedPreview = () => selectedCamera?.preview || null;
+
+function closePanels() {
+  document.body.classList.remove('connect-open', 'settings-open');
+  menu.hidden = true;
+  scrim.hidden = true;
+  toolbarMenu.setAttribute('aria-expanded', 'false');
+  toolbarSettings.setAttribute('aria-expanded', 'false');
+}
+
+function openPanel(name) {
+  const wasOpen = document.body.classList.contains(`${name}-open`);
+  closePanels();
+  if (wasOpen) return;
+  document.body.classList.add(`${name}-open`);
+  scrim.hidden = false;
+  if (name === 'settings') toolbarSettings.setAttribute('aria-expanded', 'true');
+}
+
+function updateToolbar() {
+  const camera = selectedCamera;
+  const statusText = camera?.status.textContent || 'Waiting for phone';
+  document.querySelector('.toolbar-status-text').textContent = statusText;
+  const connected = Boolean(camera?.stream);
+  toolbarSnapshot.disabled = !connected;
+  toolbarRecord.disabled = !connected;
+  const recording = camera?.recorder?.state === 'recording';
+  toolbarRecord.classList.toggle('is-recording', recording);
+  toolbarRecord.title = recording ? 'Stop recording' : 'Start recording';
+  toolbarRecord.setAttribute('aria-label', toolbarRecord.title);
+  document.getElementById('camera-count').textContent = `(${cameras.size})`;
+}
 
 function processedOutput(camera) {
   return camera.mirrored || camera.rotation !== 0 || camera.effect.value !== 'none' ||
@@ -26,6 +64,7 @@ function signal(camera, message) {
 function status(camera, message) {
   camera.status.textContent = message;
   if (selectedCamera === camera) document.querySelector('.connection-label').lastChild.textContent = ` ${message}`;
+  if (selectedCamera === camera) updateToolbar();
 }
 
 function selectCamera(camera) {
@@ -33,6 +72,7 @@ function selectCamera(camera) {
   selectedCamera = camera;
   document.querySelector('.connection-label').lastChild.textContent = ` ${camera.status.textContent}`;
   window.phoneCamDesktop?.clearFrame();
+  updateToolbar();
 }
 
 function stopPeer(camera) {
@@ -58,6 +98,8 @@ function stopPeer(camera) {
   camera.focusHint.textContent = 'Tap focus unavailable on this phone';
   camera.preview.width = 1;
   camera.preview.height = 1;
+  camera.details.textContent = 'Waiting for video';
+  updateToolbar();
 }
 
 function retryConnection(camera) {
@@ -143,6 +185,8 @@ function makePeer(camera) {
     camera.snapshotButton.disabled = false;
     camera.pauseButton.disabled = false;
     camera.switchButton.disabled = false;
+    camera.details.textContent = 'Live video';
+    updateToolbar();
     const settings = incoming.getVideoTracks()[0]?.getSettings();
     if (settings?.width) camera.details.textContent = `${settings.width} × ${settings.height}${settings.frameRate ? ` · ${Math.round(settings.frameRate)} fps` : ''}`;
   };
@@ -271,11 +315,13 @@ function toggleRecording(camera) {
       camera.recordButton.textContent = 'Record';
       camera.cancelButton.disabled = true;
       camera.recorder = null;
+      updateToolbar();
       if (useProcessed) for (const track of recordingStream.getVideoTracks()) track.stop();
     };
     recorder.start(1000);
     camera.recordButton.textContent = 'Stop recording';
     camera.cancelButton.disabled = false;
+    updateToolbar();
   } catch (error) { status(camera, `Recording error: ${error.message}`); }
 }
 
@@ -332,7 +378,11 @@ function connectionMode(camera, mode) {
 function addCamera() {
   const card = document.createElement('section');
   card.className = 'card camera-card';
-  card.innerHTML = `<div class="camera-layout"><div class="video-column"><div class="preview-heading"><div><strong>Live preview</strong><span class="details small">Waiting for video</span></div><button class="danger remove" type="button">Remove camera</button></div><div class="preview-shell"><video class="source-video" autoplay muted playsinline></video><canvas class="preview"></canvas><div class="empty-state"><div class="connection-art" aria-hidden="true"><span class="phone-art"></span><span class="connection-waves">◌ ◌</span><span class="monitor-art"></span></div><strong>Waiting for phone</strong><span>Choose Wi-Fi or USB on the right to connect</span></div></div><div class="camera-state"><span class="state-dot"></span><span class="status">Creating room…</span></div><audio autoplay muted></audio><div class="control-panel"><div class="panel-title">Camera controls</div><div class="control-grid"><button class="switch-camera secondary" disabled>⇄ <span>Switch camera</span></button><button class="mirror secondary" aria-pressed="false">⇋ <span>Mirror</span></button><button class="rotate secondary">⟳ <span>Rotate 90°</span></button><button class="pause secondary" disabled>⏸ <span>Pause</span></button><button class="audio-button secondary" disabled>♪ <span>Unmute</span></button></div><div class="effect-row"><label class="label">Video effect</label><select class="effect"><option value="none">None</option><option value="mono">Monochrome</option><option value="warm">Warm</option><option value="soft">Soft focus</option><option value="pixel">Mosaic</option></select></div></div><div class="capture-bar"><button class="snapshot secondary" disabled>◎ Snapshot</button><button class="record secondary" disabled>● Record</button></div></div><aside class="connect-panel"><div class="panel-title">Connect your phone</div><p class="connect-intro">Choose how your Android phone reaches this PC.</p><div class="mode-tabs" role="tablist" aria-label="Connection method"><button type="button" data-mode="wifi" class="active" role="tab" aria-selected="true">◉ Wi-Fi</button><button type="button" data-mode="usb" role="tab" aria-selected="false">⚡ USB</button></div><div class="wifi-instructions"><div class="step"><b>1</b><div><strong>Same Wi-Fi</strong><p>Connect your phone and this PC to the same network.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address wifi-address">Finding PC address…</div><button type="button" class="copy-link secondary">Copy address</button><p class="wifi-note"></p></div></div></div><div class="usb-instructions" hidden><div class="step"><b>1</b><div><strong>Connect USB cable</strong><p>Enable USB debugging, then allow this PC on your phone.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address usb-address">http://localhost:8080/phone</div><p>ADB reverse forwarding must be active on this PC.</p></div></div></div><div class="step code-step"><b>3</b><div><strong>Enter this pairing code</strong><div class="code">······</div><button class="new-code secondary" type="button">Get new code</button></div></div><p class="connect-footer">Allow camera access on your phone and tap <strong>Start camera</strong>. The live feed will appear here.</p></aside></div>`;
+  card.innerHTML = `<div class="camera-layout"><div class="video-column"><div class="preview-heading"><div><strong>Live preview</strong><span class="details small">Waiting for video</span></div><div class="preview-actions"><button class="popout-feed secondary" type="button">Open feed window</button><button class="danger remove" type="button">Remove camera</button></div></div><div class="preview-shell"><video class="source-video" autoplay muted playsinline></video><canvas class="preview"></canvas><button class="exit-feed-fullscreen" type="button">Exit fullscreen</button><div class="empty-state"><div class="connection-art" aria-hidden="true"><span class="phone-art"></span><span class="connection-waves">◌ ◌</span><span class="monitor-art"></span></div><strong>Waiting for phone</strong><span>Use the connection button below to pair your phone</span></div></div><div class="camera-state"><span class="state-dot"></span><span class="status">Creating room…</span></div><audio autoplay muted></audio><div class="control-panel"><div class="panel-title">Camera controls</div><div class="control-grid"><button class="switch-camera secondary" disabled>⇄ <span>Switch camera</span></button><button class="mirror secondary" aria-pressed="false">⇋ <span>Mirror</span></button><button class="rotate secondary">⟳ <span>Rotate 90°</span></button><button class="pause secondary" disabled>⏸ <span>Pause</span></button><button class="audio-button secondary" disabled>♪ <span>Unmute</span></button></div><div class="effect-row"><label class="label">Video effect</label><select class="effect"><option value="none">None</option><option value="mono">Monochrome</option><option value="warm">Warm</option><option value="soft">Soft focus</option><option value="pixel">Mosaic</option></select></div></div><div class="capture-bar"><button class="snapshot secondary" disabled>◎ Snapshot</button><button class="record secondary" disabled>● Record</button></div></div><aside class="connect-panel"><div class="panel-title">Connect your phone</div><p class="connect-intro">Choose how your Android phone reaches this PC.</p><div class="mode-tabs" role="tablist" aria-label="Connection method"><button type="button" data-mode="wifi" class="active" role="tab" aria-selected="true">◉ Wi-Fi</button><button type="button" data-mode="usb" role="tab" aria-selected="false">⚡ USB</button></div><div class="wifi-instructions"><div class="step"><b>1</b><div><strong>Same Wi-Fi</strong><p>Connect your phone and this PC to the same network.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address wifi-address">Finding PC address…</div><button type="button" class="copy-link secondary">Copy address</button><p class="wifi-note"></p></div></div></div><div class="usb-instructions" hidden><div class="step"><b>1</b><div><strong>Connect USB cable</strong><p>Enable USB debugging, then allow this PC on your phone.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address usb-address">http://localhost:8080/phone</div><p>ADB reverse forwarding must be active on this PC.</p></div></div></div><div class="step code-step"><b>3</b><div><strong>Enter this pairing code</strong><div class="code">······</div><button class="new-code secondary" type="button">Get new code</button></div></div><p class="connect-footer">Allow camera access on your phone and tap <strong>Start camera</strong>. The live feed will appear here.</p></aside></div>`;
+  for (const panel of card.querySelectorAll('.control-panel,.connect-panel')) {
+    panel.insertAdjacentHTML('afterbegin', '<button type="button" class="panel-close" aria-label="Close panel">×</button>');
+    panel.querySelector('.panel-close').onclick = closePanels;
+  }
   card.querySelector('.effect-row').insertAdjacentHTML('afterend', `<details class="color-panel"><summary>Color and overlay</summary><div class="color-grid"><label>Brightness <input data-color="brightness" data-default="100" type="range" min="0" max="200" value="100"></label><label>Contrast <input data-color="contrast" data-default="100" type="range" min="0" max="200" value="100"></label><label>Saturation <input data-color="saturation" data-default="100" type="range" min="0" max="200" value="100"></label><label>Hue <input data-color="hue" data-default="0" type="range" min="-180" max="180" value="0"></label></div><label class="overlay-label">Overlay image <input class="overlay-file" type="file" accept="image/*"></label><button type="button" class="remove-overlay secondary">Remove overlay</button><button type="button" class="reset-color secondary">Reset color</button></details>`);
   card.querySelector('.effect-row').insertAdjacentHTML('afterend', '<div class="pc-zoom"><label>Phone zoom <input class="pc-zoom-input" type="range" min="1" max="2" step="0.1" value="1" disabled></label><span class="pc-zoom-value">Unavailable</span></div><p class="focus-hint">Tap focus unavailable on this phone</p>');
   card.querySelector('.capture-bar').insertAdjacentHTML('beforeend', '<button class="cancel-recording secondary" disabled>Discard recording</button>');
@@ -365,6 +415,15 @@ function addCamera() {
     catch { status(camera, 'Could not copy address. Select and copy the address above.'); }
   };
   camera.snapshotButton.onclick = () => snapshot(camera);
+  card.querySelector('.popout-feed').onclick = () => {
+    selectCamera(camera);
+    if (window.phoneCamDesktop?.openFeedWindow) window.phoneCamDesktop.openFeedWindow();
+    else if (!window.open('/feed', '_blank')) status(camera, 'Allow this site to open a feed tab.');
+  };
+  card.querySelector('.exit-feed-fullscreen').onclick = () => {
+    if (window.phoneCamDesktop?.toggleFullscreen) window.phoneCamDesktop.toggleFullscreen();
+    else document.exitFullscreen();
+  };
   camera.recordButton.onclick = () => toggleRecording(camera);
   camera.cancelButton.onclick = () => discardRecording(camera);
   camera.zoomInput.oninput = () => {
@@ -420,23 +479,66 @@ function addCamera() {
       if (next) selectCamera(next);
       else { selectedCamera = null; window.phoneCamDesktop?.clearFrame(); }
     }
+    closePanels();
+    updateToolbar();
   };
   newCode(camera).catch(error => status(camera, error.message));
   showConnection(camera);
 }
 
 document.getElementById('add-camera').onclick = addCamera;
+document.getElementById('connection-status').onclick = () => openPanel('connect');
+toolbarSnapshot.onclick = () => { if (selectedCamera) snapshot(selectedCamera); };
+toolbarRecord.onclick = () => { if (selectedCamera) toggleRecording(selectedCamera); };
+toolbarSettings.onclick = () => openPanel('settings');
+toolbarMenu.onclick = () => {
+  const opening = menu.hidden;
+  closePanels();
+  if (opening) {
+    menu.hidden = false;
+    scrim.hidden = false;
+    toolbarMenu.setAttribute('aria-expanded', 'true');
+  }
+};
+scrim.onclick = closePanels;
+menu.onclick = event => {
+  const action = event.target.closest('button')?.dataset.action;
+  if (!action) return;
+  closePanels();
+  if (action === 'connect') openPanel('connect');
+  else if (action === 'settings') openPanel('settings');
+  else if (action === 'new-camera') { addCamera(); openPanel('connect'); }
+  else if (action === 'open-feed') selectedCamera?.card.querySelector('.popout-feed')?.click();
+  else if (action === 'fullscreen') document.getElementById('fullscreen').click();
+  else if (action === 'on-top') alwaysOnTopButton.click();
+  else if (action === 'select-camera') {
+    const list = [...cameras];
+    if (list.length > 1) selectCamera(list[(list.indexOf(selectedCamera) + 1) % list.length]);
+  }
+};
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  if (document.body.classList.contains('desktop-fullscreen')) window.phoneCamDesktop?.toggleFullscreen();
+  else closePanels();
+});
 const fullscreenButton = document.getElementById('fullscreen');
 fullscreenButton.onclick = () => {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else document.documentElement.requestFullscreen().catch(() => {});
+  if (window.phoneCamDesktop?.toggleFullscreen) window.phoneCamDesktop.toggleFullscreen();
+  else if (document.fullscreenElement) document.exitFullscreen();
+  else selectedCamera?.card.querySelector('.preview-shell')?.requestFullscreen().catch(() => {});
 };
+window.phoneCamDesktop?.onFullscreenChange(enabled => {
+  document.body.classList.toggle('desktop-fullscreen', enabled);
+  fullscreenButton.textContent = enabled ? 'Exit fullscreen' : 'Fullscreen';
+  closePanels();
+});
 document.addEventListener('fullscreenchange', () => {
   fullscreenButton.textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
 });
 const alwaysOnTopButton = document.getElementById('always-on-top');
 if (window.phoneCamDesktop?.setAlwaysOnTop) {
   alwaysOnTopButton.hidden = false;
+  menu.querySelector('[data-action="on-top"]').hidden = false;
   alwaysOnTopButton.onclick = () => {
     const enabled = alwaysOnTopButton.getAttribute('aria-pressed') !== 'true';
     window.phoneCamDesktop.setAlwaysOnTop(enabled);
@@ -471,3 +573,4 @@ window.phoneCamDesktop?.onShortcut(action => {
   else if (selectedCamera && action === 'discard-recording') discardRecording(selectedCamera);
 });
 addCamera();
+openPanel('connect');

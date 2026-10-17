@@ -2,7 +2,7 @@
 
 The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEATURE_AUDIT.md). A built component is not counted as complete until its phone-to-Windows acceptance test passes.
 
-## Current baseline (0.3.1)
+## Current baseline (0.4.0)
 
 - [x] Android browser camera capture and WebRTC preview on a physical phone
 - [x] Local pairing server, separate pairing rooms, and signaling test
@@ -13,7 +13,9 @@ The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEA
 - [x] Basic front/rear switch, browser-dependent controls, mirror/rotate, effects, snapshots, recordings, and shortcuts
 - [x] Desktop color adjustments, image overlay, recording discard, fullscreen, stay-on-top, PC zoom/tap focus signaling, and reconnect retry paths
 - [x] Install and enumerate PhoneCam virtual camera on this PC; capture a frame through Media Foundation
-- [ ] Verify Wi-Fi camera capture with Android trust configured
+- [x] Verify Wi-Fi camera capture with Android trust configured and live frames in Windows preview and Media Foundation
+- [x] Build compact video-first Windows layout with bottom controls, connection/settings dialogs, options menu, feed window, and feed-only fullscreen
+- [x] Correct the native virtual camera's default RGB mask so all three color channels pass to Windows camera consumers
 - [ ] Verify Windows Camera, Zoom, Teams, OBS, and browser selection
 - [ ] Complete a stable 30-minute USB and Wi-Fi call with measured latency, dropped frames, and reconnect time
 
@@ -38,7 +40,7 @@ The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEA
 - [ ] Person segmentation, background blur/bokeh/mosaic/green screen/transparency/custom image or video
 - [ ] Effect strength, full color controls, LUT filters, image overlay, and face enhancement
 - [ ] Time lapse, cancel recording, save folder/prefix, interrupted-file recovery
-- [ ] Fullscreen, borderless, always-on-top, startup, command-line options, customizable hotkeys, GPU choice, hardware decode, bitrate and logs
+- [ ] Borderless mode, startup options, customizable hotkeys, GPU choice, hardware decode, bitrate and logs
 - [ ] Battery-saving phone display behavior and network-quality indicator
 
 ## Development rules

@@ -106,6 +106,8 @@ test('pairs two peers and relays signaling', async () => {
     secondPhone.send(JSON.stringify({ type: 'offer', sdp: { type: 'offer', sdp: 'second-room' } }));
     assert.equal((await nextSecondViewer()).sdp.sdp, 'second-room');
     assert.equal((await fetch(`${base}/viewer.js`)).status, 200);
+    assert.equal((await fetch(`${base}/feed`)).status, 200);
+    assert.equal((await fetch(`${base}/feed.js`)).status, 200);
     assert.equal((await fetch(`${base}/phone.js`)).status, 200);
   } finally {
     for (const socket of sockets) socket.terminate();
