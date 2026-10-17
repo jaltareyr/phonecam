@@ -8,12 +8,12 @@
 
 #include <initguid.h>
 
-// {7B89B92E-FE71-42D0-8A41-E137D06EA184}
+// PhoneCam media source: {2C01C8CD-D79C-416A-8700-7F7924E08088}
 DEFINE_GUID(CLSID_VirtualCameraMediaSource ,
-    0x7b89b92e, 0xfe71, 0x42d0, 0x8a, 0x41, 0xe1, 0x37, 0xd0, 0x6e, 0xa1, 0x84);
+    0x2c01c8cd, 0xd79c, 0x416a, 0x87, 0x00, 0x7f, 0x79, 0x24, 0xe0, 0x80, 0x88);
 
-static LPCWSTR VIRTUALCAMERAMEDIASOURCE_CLSID = L"{7B89B92E-FE71-42D0-8A41-E137D06EA184}";
-static LPCWSTR VIRTUALCAMERAMEDIASOURCE_FRIENDLYNAME = L"VirtualCameraMediaSource";
+static LPCWSTR VIRTUALCAMERAMEDIASOURCE_CLSID = L"{2C01C8CD-D79C-416A-8700-7F7924E08088}";
+static LPCWSTR VIRTUALCAMERAMEDIASOURCE_FRIENDLYNAME = L"PhoneCam";
 
 // The below 2 GUIDs are defined in Windows build 22621 and above only,
 // if targetting SDK for Windows 22621 or higher this would need to be commented out.

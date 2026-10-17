@@ -8,7 +8,7 @@
 namespace winrt::WindowsSample::implementation
 {
     //CLSID_VirtualCameraMediaSource
-    struct __declspec(uuid("7B89B92E-FE71-42D0-8A41-E137D06EA184"))
+    struct __declspec(uuid("2C01C8CD-D79C-416A-8700-7F7924E08088"))
         VirtualCameraMediaSourceActivate : winrt::implements<VirtualCameraMediaSourceActivate, IMFActivate>
     {
         VirtualCameraMediaSourceActivate() = default;

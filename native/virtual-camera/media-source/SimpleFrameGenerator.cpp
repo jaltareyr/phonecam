@@ -2,6 +2,80 @@
 // Copyright (C) Microsoft Corporation. All rights reserved.
 //
 #include "pch.h"
+#include <algorithm>
+
+extern HINSTANCE g_hInst;
+
+namespace {
+constexpr DWORD frameWidth = 1280;
+constexpr DWORD frameHeight = 720;
+constexpr DWORD frameBytes = frameWidth * frameHeight * 4;
+
+struct FrameFile {
+    volatile LONG sequence;
+    DWORD width;
+    DWORD height;
+    DWORD timestampMs;
+    BYTE rgba[frameBytes];
+};
+
+FrameFile* openFrameFile()
+{
+    static HANDLE file = INVALID_HANDLE_VALUE;
+    static HANDLE mapping = nullptr;
+    static FrameFile* frame = nullptr;
+    if (frame) return frame;
+    WCHAR path[MAX_PATH];
+    if (!g_hInst || !GetModuleFileNameW(g_hInst, path, MAX_PATH)) return nullptr;
+    WCHAR* separator = wcsrchr(path, L'\\');
+    if (!separator) return nullptr;
+    *(separator + 1) = L'\0';
+    if (wcscat_s(path, L"frame.bin") != 0) return nullptr;
+    file = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return nullptr;
+    mapping = CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr);
+    if (!mapping) { CloseHandle(file); file = INVALID_HANDLE_VALUE; return nullptr; }
+    frame = static_cast<FrameFile*>(MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, sizeof(FrameFile)));
+    if (!frame) { CloseHandle(mapping); CloseHandle(file); mapping = nullptr; file = INVALID_HANDLE_VALUE; }
+    return frame;
+}
+
+bool copyLiveFrame(BYTE* output, DWORD length, LONG pitch, DWORD width, DWORD height, ULONG mask)
+{
+    FrameFile* frame = openFrameFile();
+    if (!frame || width != frameWidth || height != frameHeight ||
+        pitch < static_cast<LONG>(width * 4) || length < static_cast<DWORD>(pitch) * height) return false;
+    FILETIME nowFileTime;
+    GetSystemTimeAsFileTime(&nowFileTime);
+    ULARGE_INTEGER now{};
+    now.LowPart = nowFileTime.dwLowDateTime;
+    now.HighPart = nowFileTime.dwHighDateTime;
+    const DWORD nowMs = static_cast<DWORD>((now.QuadPart - 116444736000000000ULL) / 10000);
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        const LONG before = frame->sequence;
+        if (before & 1) continue;
+        MemoryBarrier();
+        if (frame->width != width || frame->height != height ||
+            nowMs - frame->timestampMs > 5000) return false;
+        for (DWORD row = 0; row < height; ++row) {
+            const BYTE* source = frame->rgba + row * width * 4;
+            BYTE* target = output + row * pitch;
+            for (DWORD column = 0; column < width; ++column) {
+                target[0] = source[2] & static_cast<BYTE>(mask);
+                target[1] = source[1] & static_cast<BYTE>(mask >> 8);
+                target[2] = source[0] & static_cast<BYTE>(mask >> 16);
+                target[3] = 0xff;
+                source += 4;
+                target += 4;
+            }
+        }
+        MemoryBarrier();
+        if (before == frame->sequence) return true;
+    }
+    return false;
+}
+}
 
 HRESULT SimpleFrameGenerator::Initialize(_In_ IMFMediaType* pMediaType)
 {
@@ -74,20 +148,12 @@ HRESULT SimpleFrameGenerator::_CreateRGB32Frame(
         return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
     }
 
-    LONGLONG curSysTimeInS = MFGetSystemTime() / (MFTIME)10000000;
-    int offset = curSysTimeInS % height;
+    if (copyLiveFrame(pBuf, len, pitch, width, height, rgbMask)) return S_OK;
 
-    for (unsigned int r = 0; r < height; r++)
-    {
-        uint32_t* p = (uint32_t*)(pBuf + (r * pitch));
-        for (unsigned int c = 0; c < width; c++)
-        {
-            BYTE gray = (BYTE)(r + offset);
-            *p = ((uint32_t)gray << 16 | (uint32_t)gray << 8 | (uint32_t)gray) & rgbMask;
-            p++;
-        }
+    // A stopped or disconnected phone shows black rather than an old frame.
+    for (DWORD row = 0; row < height; ++row) {
+        ZeroMemory(pBuf + row * pitch, width * 4);
     }
-
     return S_OK;
 }
 

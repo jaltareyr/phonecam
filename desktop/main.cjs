@@ -1,10 +1,26 @@
-const { app, BrowserWindow, dialog, globalShortcut } = require('electron');
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain } = require('electron');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const { openFrameStore, PIXEL_BYTES } = require('./frame-store.cjs');
 
 const baseUrl = 'http://127.0.0.1:8080';
 let serverProcess = null;
 let mainWindow = null;
+let frameStore = null;
+
+function openFrameFile() {
+  const nativeDir = app.isPackaged
+    ? path.join(path.dirname(process.execPath), 'native')
+    : path.join(app.getAppPath(), 'native', 'virtual-camera', 'x64', 'Release');
+  frameStore = openFrameStore(nativeDir);
+  ipcMain.on('phonecam-frame', (event, data) => {
+    if (event.sender !== mainWindow?.webContents) return;
+    if (data?.byteLength === PIXEL_BYTES) frameStore.writeFrame(data);
+  });
+  ipcMain.on('phonecam-clear-frame', event => {
+    if (event.sender === mainWindow?.webContents) frameStore.clear();
+  });
+}
 
 async function serverIsReady() {
   try {
@@ -33,6 +49,7 @@ async function ensureServer() {
 
 async function createWindow() {
   await ensureServer();
+  openFrameFile();
   mainWindow = new BrowserWindow({
     width: 1060,
     height: 850,
@@ -68,5 +85,6 @@ app.whenReady().then(createWindow).catch(error => {
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
   globalShortcut.unregisterAll();
+  frameStore?.close();
   if (serverProcess && serverProcess.exitCode === null) serverProcess.kill();
 });

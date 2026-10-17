@@ -21,5 +21,7 @@ if (-not (Test-Path -LiteralPath $nuget)) {
 
 & $nuget restore (Join-Path $nativeRoot 'media-source\packages.config') -PackagesDirectory $packages -NonInteractive
 if ($LASTEXITCODE -ne 0) { throw 'NuGet restore failed.' }
-& $msbuild $project "/p:Configuration=$Configuration" '/p:Platform=x64' "/p:WindowsTargetPlatformVersion=$($sdk.Name)" "/p:SolutionDir=$nativeRoot\" '/m' '/v:minimal'
+& $msbuild $project "/p:Configuration=$Configuration" '/p:Platform=x64' "/p:WindowsTargetPlatformVersion=$($sdk.Name)" "/p:SolutionDir=$nativeRoot\" '/p:TargetName=PhoneCamMediaSource' '/m' '/v:minimal'
 if ($LASTEXITCODE -ne 0) { throw 'Media source build failed.' }
+& $msbuild (Join-Path $nativeRoot 'manager.vcxproj') "/p:Configuration=$Configuration" '/p:Platform=x64' "/p:WindowsTargetPlatformVersion=$($sdk.Name)" '/m' '/v:minimal'
+if ($LASTEXITCODE -ne 0) { throw 'Camera manager build failed.' }

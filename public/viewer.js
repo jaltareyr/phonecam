@@ -11,6 +11,7 @@ function status(camera, message) { camera.status.textContent = message; }
 function selectCamera(camera) {
   for (const item of cameras) item.card.classList.toggle('selected', item === camera);
   selectedCamera = camera;
+  window.phoneCamDesktop?.clearFrame();
 }
 
 function stopPeer(camera) {
@@ -21,6 +22,7 @@ function stopPeer(camera) {
   camera.source.srcObject = null;
   camera.audio.srcObject = null;
   camera.stream = null;
+  if (selectedCamera === camera) window.phoneCamDesktop?.clearFrame();
   camera.card.classList.remove('connected');
   camera.paused = false;
   camera.pauseButton.textContent = 'Pause';
@@ -63,6 +65,19 @@ function renderFrame(camera) {
       ctx.drawImage(small, 0, 0, video.videoWidth, video.videoHeight);
     } else ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
     ctx.restore();
+    if (camera === selectedCamera && window.phoneCamDesktop?.sendFrame &&
+        performance.now() - (camera.lastExport || 0) >= 33) {
+      camera.lastExport = performance.now();
+      const bridge = camera.bridgeCanvas;
+      const bridgeContext = bridge.getContext('2d', { alpha: false, willReadFrequently: true });
+      bridgeContext.fillStyle = '#000';
+      bridgeContext.fillRect(0, 0, bridge.width, bridge.height);
+      const scale = Math.min(bridge.width / canvas.width, bridge.height / canvas.height);
+      const width = canvas.width * scale;
+      const height = canvas.height * scale;
+      bridgeContext.drawImage(canvas, (bridge.width - width) / 2, (bridge.height - height) / 2, width, height);
+      window.phoneCamDesktop.sendFrame(bridgeContext.getImageData(0, 0, bridge.width, bridge.height).data);
+    }
   }
   camera.frameRequest = requestAnimationFrame(() => renderFrame(camera));
 }
@@ -205,8 +220,11 @@ function addCamera() {
     pauseButton: card.querySelector('.pause'), audioButton: card.querySelector('.audio-button'),
     switchButton: card.querySelector('.switch-camera'),
     effect: card.querySelector('.effect'), pixelCanvas: document.createElement('canvas'),
+    bridgeCanvas: document.createElement('canvas'),
     pendingCandidates: [], mirrored: false, rotation: 0, paused: false
   };
+  camera.bridgeCanvas.width = 1280;
+  camera.bridgeCanvas.height = 720;
   cameras.add(camera);
   grid.append(card);
   selectCamera(camera);

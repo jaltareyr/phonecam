@@ -74,11 +74,11 @@ Native function analysis needs Ghidra 12.1.x and a compatible JDK. Those are not
 | Effects and orientation | Mirror, 90° rotation, monochrome, warm color, soft focus, and mosaic preview. Snapshots and processed recordings include them. AI person segmentation, background replacement, and face retouching are pending. |
 | Capture | PNG snapshots and WebM/MP4 recording through the browser's MediaRecorder. Unprocessed recording keeps the incoming stream's frame rate; processed recording is captured at 30 fps. |
 | Windows controls | Window, selected-camera shortcuts Ctrl+S/R/P/N, and global shortcuts Ctrl+Alt+S/R/P/N. |
-| Virtual webcam and microphone devices | Pending. The Windows Media Foundation API is available on this PC, but PhoneCam does not yet appear as a camera in Zoom, Teams, OBS, or Windows Camera. |
+| Virtual webcam and microphone devices | A native 720p PhoneCam media source and live frame bridge now build and ship with the desktop package. Windows camera registration and app compatibility are still unverified because the required administrator UAC prompt was canceled. A Windows virtual microphone is pending. |
 
 ## Next milestones
 
-1. Build a PhoneCam Media Foundation virtual camera source and bridge the received frames to it.
+1. Register and validate the PhoneCam virtual camera with administrator approval; test live frames in Windows Camera and a video-call app.
 2. Add AI background segmentation and replacement.
 3. Validate phone audio, multiple physical phones, Wi-Fi pairing, and higher resolutions on devices that support them.
 4. Add virtual microphone support, reconnect handling, and an installer.
