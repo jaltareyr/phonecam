@@ -4,7 +4,7 @@ An independent Android-to-Windows camera prototype. The Android phone captures v
 
 ## Start
 
-Use Node.js 22.19+ or 24.11+.
+PhoneCam runs with Node.js 20+. REA's separate CLI requires Node.js 22.19+ or 24.11+.
 
 ```powershell
 npm install
