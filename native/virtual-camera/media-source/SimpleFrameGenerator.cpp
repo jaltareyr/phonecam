@@ -45,8 +45,11 @@ FrameFile* openFrameFile()
 bool copyLiveFrame(BYTE* output, DWORD length, LONG pitch, DWORD width, DWORD height, ULONG mask)
 {
     FrameFile* frame = openFrameFile();
+    // RGB surfaces may have a negative stride. Lock2DSize still points output at
+    // the top visible row, so each following row is output + row * pitch.
+    const auto stride = static_cast<ULONGLONG>(std::abs(pitch));
     if (!frame || width != frameWidth || height != frameHeight ||
-        pitch < static_cast<LONG>(width * 4) || length < static_cast<DWORD>(pitch) * height) return false;
+        stride < width * 4 || stride * height > length) return false;
     FILETIME nowFileTime;
     GetSystemTimeAsFileTime(&nowFileTime);
     ULARGE_INTEGER now{};

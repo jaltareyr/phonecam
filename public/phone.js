@@ -2,6 +2,7 @@ import { captureCandidates, preferVideoCodec, bitrateCeiling, videoStats } from 
 
 const form = document.getElementById('pair-form');
 const statusElement = document.getElementById('status');
+const settingsStatus = document.getElementById('phone-settings-status');
 const actualSettings = document.getElementById('actual-settings');
 const streamSettings = document.getElementById('stream-settings');
 const cameraSelect = document.getElementById('camera-select');
@@ -14,6 +15,20 @@ const exposureLock = document.getElementById('exposure-lock');
 const exposure = document.getElementById('exposure');
 const exposureValue = document.getElementById('exposure-value');
 const torch = document.getElementById('torch');
+const settingsDrawer = document.getElementById('phone-settings-drawer');
+const controlsDrawer = document.getElementById('phone-controls-drawer');
+const phoneScrim = document.getElementById('phone-scrim');
+const phoneStart = document.getElementById('phone-start');
+const phoneSwitch = document.getElementById('phone-switch');
+const phoneControlsToggle = document.getElementById('phone-controls-toggle');
+try {
+  const saved = JSON.parse(localStorage.getItem('phonecam-camera-settings') || '{}');
+  if ([...document.getElementById('resolution').options].some(option => option.value === saved.resolution))
+    document.getElementById('resolution').value = saved.resolution;
+  if ([...document.getElementById('frame-rate').options].some(option => option.value === saved.frameRate))
+    document.getElementById('frame-rate').value = saved.frameRate;
+  document.getElementById('send-audio').checked = saved.sendAudio === true;
+} catch { /* Private browsing can block local storage. */ }
 const linkCode = new URLSearchParams(location.search).get('code');
 if (linkCode && /^[A-HJ-NP-Z2-9]{6}$/i.test(linkCode)) document.getElementById('pair-code').value = linkCode.toUpperCase();
 if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -34,7 +49,37 @@ let previousStats;
 let stalledSamples = 0;
 let recoveryAttempted = false;
 
-function status(message) { statusElement.textContent = message; }
+function status(message) { statusElement.textContent = message; settingsStatus.textContent = message; }
+function closeDrawers() {
+  settingsDrawer.hidden = true;
+  controlsDrawer.hidden = true;
+  phoneScrim.hidden = true;
+}
+function openDrawer(drawer) {
+  closeDrawers();
+  drawer.hidden = false;
+  phoneScrim.hidden = false;
+}
+function stopCapture() {
+  reconnectBlocked = true;
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  socket?.close();
+  closePeer();
+  stream?.getTracks().forEach(track => track.stop());
+  stream = null;
+  preview.srcObject = null;
+  controls.hidden = true;
+  document.body.classList.remove('streaming');
+  phoneStart.textContent = 'Start';
+  phoneStart.setAttribute('aria-label', 'Start camera');
+  phoneSwitch.disabled = true;
+  phoneControlsToggle.disabled = true;
+  actualSettings.textContent = '';
+  streamSettings.textContent = '';
+  closeDrawers();
+  status('Camera stopped');
+}
 function signal(message) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
 function closePeer() { clearInterval(statsTimer); previousStats = null; stalledSamples = 0; recoveryAttempted = false; peer?.close(); peer = null; pendingCandidates = []; }
 function videoTrack() { return stream?.getVideoTracks()[0]; }
@@ -250,6 +295,7 @@ async function restartCapture() {
     : { facingMode: { ideal: value.slice(7) } };
   if (!value.startsWith('device:')) preferredFacing = value.slice(7);
   if (stream) {
+    document.body.classList.remove('streaming');
     stream.getTracks().forEach(track => track.stop());
     stream = null;
     preview.srcObject = null;
@@ -282,6 +328,11 @@ async function restartCapture() {
   }
   preview.srcObject = stream;
   await preview.play();
+  document.body.classList.add('streaming');
+  phoneStart.textContent = 'Stop';
+  phoneStart.setAttribute('aria-label', 'Stop camera');
+  phoneSwitch.disabled = false;
+  phoneControlsToggle.disabled = false;
   showCapabilities();
   streamSettings.textContent = 'Waiting for WebRTC stream measurements…';
   preferredFacing = videoTrack()?.getSettings().facingMode || preferredFacing;
@@ -327,6 +378,13 @@ form.onsubmit = async event => {
   code = document.getElementById('pair-code').value.toUpperCase().trim();
   if (!/^[A-HJ-NP-Z2-9]{6}$/.test(code)) { status('Enter the six-character code on your PC'); return; }
   try {
+    localStorage.setItem('phonecam-camera-settings', JSON.stringify({
+      resolution: document.getElementById('resolution').value,
+      frameRate: document.getElementById('frame-rate').value,
+      sendAudio: document.getElementById('send-audio').checked
+    }));
+  } catch { /* Camera capture still works without saved preferences. */ }
+  try {
     if (socket && socket.readyState < WebSocket.CLOSING) {
       const previous = socket;
       const closed = new Promise(resolve => previous.addEventListener('close', resolve, { once: true }));
@@ -336,8 +394,22 @@ form.onsubmit = async event => {
     closePeer();
     await restartCapture();
     connect();
+    closeDrawers();
   } catch (error) { status(cameraErrorMessage(error)); }
 };
+
+phoneStart.onclick = event => {
+  if (!stream) return;
+  event.preventDefault();
+  stopCapture();
+};
+phoneSwitch.onclick = () => switchCamera();
+phoneControlsToggle.onclick = () => openDrawer(controlsDrawer);
+document.getElementById('phone-settings-toggle').onclick = () => openDrawer(settingsDrawer);
+phoneScrim.onclick = closeDrawers;
+document.querySelectorAll('.phone-drawer-close').forEach(button => button.onclick = closeDrawers);
+document.addEventListener('keydown', event => { if (event.key === 'Escape') closeDrawers(); });
+if (!linkCode) openDrawer(settingsDrawer);
 
 zoom.oninput = async () => {
   zoomValue.textContent = `${Number(zoom.value).toFixed(1)}×`;

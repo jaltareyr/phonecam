@@ -98,7 +98,10 @@ async function createWindow() {
     title: 'PhoneCam',
     backgroundColor: '#091519',
     autoHideMenuBar: true,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.cjs') }
+    // The virtual camera is fed by this page's animation loop. Keep it running
+    // while a call app is in front or the PhoneCam window is minimized.
+    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true,
+      backgroundThrottling: false, preload: path.join(__dirname, 'preload.cjs') }
   });
   ipcMain.on('phonecam-always-on-top', (event, enabled) => {
     if (event.sender === mainWindow?.webContents) mainWindow.setAlwaysOnTop(Boolean(enabled));

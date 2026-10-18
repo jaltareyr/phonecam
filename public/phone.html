@@ -1,3 +1,66 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PhoneCam · Phone</title><link rel="stylesheet" href="/style.css"></head>
-<body data-role="phone"><main><div class="eyebrow">PHONECAM / ANDROID</div><h1>Send your camera</h1><p class="intro">Enter the code from the Windows app, then choose your camera and quality.</p><form id="pair-form" class="card controls"><label for="pair-code" class="label">Pairing code</label><input id="pair-code" autocomplete="off" inputmode="text" maxlength="6" placeholder="ABC234" required><label for="camera-select" class="label">Camera</label><select id="camera-select"><option value="facing:environment">Back camera</option><option value="facing:user">Front camera</option></select><div class="field-row"><div><label for="resolution" class="label">Resolution</label><select id="resolution"><option value="1280x720">720p</option><option value="1920x1080" selected>1080p</option><option value="2560x1440">1440p</option><option value="3840x2160">4K</option><option value="640x480">480p</option></select></div><div><label for="frame-rate" class="label">Frame rate</label><select id="frame-rate"><option>15</option><option selected>30</option><option>60</option><option>120</option><option>240</option></select></div></div><label class="check"><input id="send-audio" type="checkbox">Send phone microphone</label><button type="submit">Start camera</button><p id="status">Ready to pair</p><p id="actual-settings" class="small"></p><p id="stream-settings" class="small"></p><p id="certificate-help" class="small" hidden><a href="/phonecam-ca.crt" download>Download PhoneCam Wi-Fi certificate</a>, install it as a CA certificate in Android Settings, then reopen this page. Only install a certificate from your own PC.</p></form><video id="local-video" autoplay muted playsinline></video><div id="camera-controls" class="card controls" hidden><h2>Camera controls</h2><label for="zoom" class="label">Zoom <span id="zoom-value"></span></label><input id="zoom" type="range" step="0.1" disabled><label class="check"><input id="focus-lock" type="checkbox" disabled>Lock focus</label><label class="check"><input id="exposure-lock" type="checkbox" disabled>Lock exposure</label><label for="exposure" class="label">Exposure adjustment <span id="exposure-value"></span></label><input id="exposure" type="range" disabled><label class="check"><input id="torch" type="checkbox" disabled>Flashlight</label><p class="small">Controls are enabled only when Android exposes them. Tap the preview to focus if point-of-interest control is available.</p></div><p class="hint">Keep this page open. Actual resolution and frame rate depend on the selected camera and Android browser.</p></main><script type="module" src="/phone.js"></script></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080d14">
+  <title>PhoneCam · Phone</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-role="phone">
+  <main class="phone-app">
+    <section class="phone-stage" aria-label="Phone camera preview">
+      <video id="local-video" autoplay muted playsinline aria-label="Live phone camera"></video>
+      <div class="phone-empty" id="phone-empty">
+        <div class="phone-empty-icon" aria-hidden="true">◉</div>
+        <strong>Your camera preview appears here</strong>
+        <span>Pair this phone with PhoneCam on your PC, then tap Start camera.</span>
+      </div>
+      <header class="phone-topbar">
+        <div class="phone-brand"><span class="phone-brand-mark">◉</span><span>PhoneCam</span></div>
+        <button type="button" id="phone-settings-toggle" class="phone-icon-button" aria-label="Open connection and video settings">⚙</button>
+      </header>
+      <div class="phone-feedback" aria-live="polite">
+        <p id="status">Ready to pair</p>
+        <p id="actual-settings"></p>
+        <p id="stream-settings"></p>
+      </div>
+      <footer class="phone-actionbar">
+        <button type="button" id="phone-switch" class="phone-side-button" disabled><span aria-hidden="true">⇄</span><small>Flip</small></button>
+        <button type="submit" form="pair-form" id="phone-start" class="phone-start-button" aria-label="Start camera">Start</button>
+        <button type="button" id="phone-controls-toggle" class="phone-side-button" disabled><span aria-hidden="true">☷</span><small>Controls</small></button>
+      </footer>
+    </section>
+    <div class="phone-scrim" id="phone-scrim" hidden></div>
+    <aside class="phone-drawer" id="phone-settings-drawer" aria-label="Connection and camera settings" hidden>
+      <div class="phone-drawer-head"><div><span class="phone-drawer-kicker">PHONECAM</span><h1>Camera settings</h1></div><button type="button" class="phone-drawer-close" aria-label="Close settings">×</button></div>
+      <form id="pair-form" class="phone-form">
+        <p class="phone-section-heading">Connection</p>
+        <label for="pair-code" class="label">Pairing code</label>
+        <input id="pair-code" autocomplete="off" inputmode="text" maxlength="6" placeholder="ABC234" required>
+        <p class="phone-help">Scan the QR code in the Windows app to fill this automatically.</p>
+        <p class="phone-section-heading">Video</p>
+        <label for="camera-select" class="label">Camera</label>
+        <select id="camera-select"><option value="facing:environment">Back camera</option><option value="facing:user">Front camera</option></select>
+        <div class="field-row"><div><label for="resolution" class="label">Resolution</label><select id="resolution"><option value="640x480">480p</option><option value="1280x720">720p</option><option value="1920x1080" selected>1080p</option><option value="2560x1440">1440p</option><option value="3840x2160">4K</option></select></div><div><label for="frame-rate" class="label">Frame rate</label><select id="frame-rate"><option>15</option><option selected>30</option><option>60</option><option>120</option><option>240</option></select></div></div>
+        <label class="check"><input id="send-audio" type="checkbox">Send phone microphone</label>
+        <button type="submit" class="phone-apply-button">Apply and start camera</button>
+        <p id="phone-settings-status" class="phone-settings-status" role="status">Ready to pair</p>
+        <p id="certificate-help" class="phone-help" hidden><a href="/phonecam-ca.crt" download>Download this PC’s PhoneCam Wi-Fi certificate</a> and install it as a CA certificate in Android Settings, then reopen this page.</p>
+      </form>
+    </aside>
+    <aside class="phone-drawer" id="phone-controls-drawer" aria-label="Live camera controls" hidden>
+      <div class="phone-drawer-head"><div><span class="phone-drawer-kicker">LIVE CAMERA</span><h2>Camera controls</h2></div><button type="button" class="phone-drawer-close" aria-label="Close controls">×</button></div>
+      <div id="camera-controls" class="phone-form" hidden>
+        <label for="zoom" class="label">Zoom <span id="zoom-value"></span></label><input id="zoom" type="range" step="0.1" disabled>
+        <label class="check"><input id="focus-lock" type="checkbox" disabled>Lock focus</label>
+        <label class="check"><input id="exposure-lock" type="checkbox" disabled>Lock exposure</label>
+        <label for="exposure" class="label">Exposure adjustment <span id="exposure-value"></span></label><input id="exposure" type="range" disabled>
+        <label class="check"><input id="torch" type="checkbox" disabled>Flashlight</label>
+        <p class="phone-help">Tap the preview to focus. Controls appear when your Android camera supports them.</p>
+      </div>
+    </aside>
+  </main>
+  <script type="module" src="/phone.js"></script>
+</body>
+</html>
