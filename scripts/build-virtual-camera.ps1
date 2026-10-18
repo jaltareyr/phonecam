@@ -18,7 +18,9 @@ if (-not $msbuild) {
 $sdkRoot = 'C:\Program Files (x86)\Windows Kits\10\Include'
 
 if (-not $msbuild -or -not (Test-Path -LiteralPath $msbuild)) { throw 'Visual Studio C++ Build Tools are required. Install the Desktop development with C++ workload, or set PHONECAM_MSBUILD.' }
-$sdk = Get-ChildItem -LiteralPath $sdkRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1
+$sdk = Get-ChildItem -LiteralPath $sdkRoot -Directory |
+  Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
+  Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
 if (-not $sdk) { throw 'Windows SDK is required.' }
 if (-not (Test-Path -LiteralPath $nuget)) {
   New-Item -ItemType Directory -Path (Split-Path -Parent $nuget) -Force | Out-Null
