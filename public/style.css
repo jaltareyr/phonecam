@@ -103,6 +103,12 @@ body[data-role=viewer] .video-column{padding:0}
 body[data-role=viewer] .preview-heading,body[data-role=viewer] .camera-state,body[data-role=viewer] .capture-bar{display:none}
 body[data-role=viewer] .preview-shell{height:100%;margin:0;display:flex;align-items:center;justify-content:center;background:#303337}
 body[data-role=viewer] .preview-shell .preview{display:block;width:100%;height:100%;border:0;border-radius:0;object-fit:contain;background:#303337}
+body[data-role=viewer] .preview-shell .source-video{display:none}
+body[data-role=viewer] .direct-preview .preview-shell .source-video{display:block;width:100%;height:100%;aspect-ratio:auto;border:0;border-radius:0;object-fit:contain;background:#303337}
+body[data-role=viewer] .direct-preview .preview-shell .preview{display:none}
+.pair-qr{display:block;width:144px;height:144px;margin:12px 0;background:#fff;padding:5px;border-radius:8px}
+.pair-qr[hidden]{display:none}
+.stream-diagnostics{color:#a2bec5;margin:7px 0 16px;font-variant-numeric:tabular-nums}
 body[data-role=viewer] .empty-state{inset:0;border-radius:0;background:radial-gradient(circle at 50% 42%,#393e44,#24282d 75%);color:#b8c5ce}
 body[data-role=viewer] .empty-state strong{color:#fff;font-size:18px}
 body[data-role=viewer] .empty-state .connection-art{color:#56b4e8}

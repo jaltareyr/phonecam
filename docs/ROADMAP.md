@@ -2,7 +2,7 @@
 
 The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEATURE_AUDIT.md). A built component is not counted as complete until its phone-to-Windows acceptance test passes.
 
-## Current baseline (0.4.0)
+## Current baseline (0.5.0)
 
 - [x] Android browser camera capture and WebRTC preview on a physical phone
 - [x] Local pairing server, separate pairing rooms, and signaling test
@@ -16,6 +16,10 @@ The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEA
 - [x] Verify Wi-Fi camera capture with Android trust configured and live frames in Windows preview and Media Foundation
 - [x] Build compact video-first Windows layout with bottom controls, connection/settings dialogs, options menu, feed window, and feed-only fullscreen
 - [x] Correct the native virtual camera's default RGB mask so all three color channels pass to Windows camera consumers
+- [x] Advertise LAN service with mDNS and provide a pairing QR code for Android Chrome
+- [x] Prefer available H.264 WebRTC codecs, set resolution-aware bitrate ceilings, and display actual encoded/received stream statistics
+- [x] Use direct video preview for unprocessed streams and retry stalled high-resolution encoding at 1080p
+- [x] Show Windows GPU video decode capability status in camera settings
 - [ ] Verify Windows Camera, Zoom, Teams, OBS, and browser selection
 - [ ] Complete a stable 30-minute USB and Wi-Fi call with measured latency, dropped frames, and reconnect time
 

@@ -5,6 +5,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
+import { Bonjour } from 'bonjour-service';
+import QRCode from 'qrcode';
 import { ensureCertificates, localIPv4 } from './certificates.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -73,7 +75,7 @@ function attachSignaling(server) {
       const client = clients.get(socket);
       if (!client || !['offer', 'answer', 'candidate', 'control', 'camera-state'].includes(message.type)) return;
       if (message.type === 'camera-state' && client.role !== 'phone') return;
-      if (message.type === 'control' && (client.role !== 'viewer' || !['pause', 'switch-camera', 'zoom', 'focus'].includes(message.action) ||
+      if (message.type === 'control' && (client.role !== 'viewer' || !['pause', 'switch-camera', 'reduce-quality', 'zoom', 'focus'].includes(message.action) ||
           (message.action === 'pause' && typeof message.enabled !== 'boolean') ||
           (message.action === 'zoom' && (!Number.isFinite(message.value) || message.value < 0.1 || message.value > 100)) ||
           (message.action === 'focus' && (!Number.isFinite(message.x) || !Number.isFinite(message.y) ||
@@ -90,6 +92,17 @@ function attachSignaling(server) {
 
 function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  if (url.pathname === '/api/qr' && req.method === 'GET') {
+    const address = url.searchParams.get('address');
+    const code = url.searchParams.get('code');
+    if (!localIPv4().includes(address) || !rooms.has(code)) { res.writeHead(404); res.end('Not found'); return; }
+    QRCode.toString(`https://${address}:${httpsPort}/phone?code=${code}`,
+      { type: 'svg', margin: 1, width: 192, errorCorrectionLevel: 'M' }).then(svg => {
+      res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(svg);
+    }).catch(() => { res.writeHead(500); res.end('QR generation failed'); });
+    return;
+  }
   if (url.pathname === '/api/connectivity' && req.method === 'GET') {
     const addresses = localIPv4();
     const tlsReady = fs.existsSync(keyPath) && fs.existsSync(certPath);
@@ -124,7 +137,7 @@ function handleRequest(req, res) {
     res.end(JSON.stringify({ ok: true, app: 'phonecam' }));
     return;
   }
-  const routes = { '/': 'viewer.html', '/viewer': 'viewer.html', '/phone': 'phone.html', '/feed': 'feed.html', '/viewer.js': 'viewer.js', '/phone.js': 'phone.js', '/feed.js': 'feed.js', '/style.css': 'style.css' };
+  const routes = { '/': 'viewer.html', '/viewer': 'viewer.html', '/phone': 'phone.html', '/feed': 'feed.html', '/viewer.js': 'viewer.js', '/phone.js': 'phone.js', '/feed.js': 'feed.js', '/stream-quality.js': 'stream-quality.js', '/style.css': 'style.css' };
   const name = routes[url.pathname];
   if (!name || req.method !== 'GET') { res.writeHead(404); res.end('Not found'); return; }
   const type = name.endsWith('.html') ? 'text/html; charset=utf-8' : name.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8';
@@ -143,6 +156,13 @@ const httpsServer = https.createServer({ key: fs.readFileSync(keyPath), cert: fs
 attachSignaling(httpsServer);
 httpsServer.listen(httpsPort, '0.0.0.0', () => {
   for (const address of localIPv4()) console.log(`Wi-Fi phone: https://${address}:${httpsPort}/phone`);
+  try {
+    const bonjour = new Bonjour({}, error => console.warn(`mDNS discovery unavailable: ${error.message}`));
+    bonjour.publish({ name: 'PhoneCam', type: 'phonecam', port: httpsPort,
+      txt: { path: '/phone', tls: '1', version: '1' } });
+    console.log('LAN discovery: _phonecam._tcp.local');
+    process.once('exit', () => bonjour.destroy());
+  } catch (error) { console.warn(`mDNS discovery unavailable: ${error.message}`); }
 });
 let certificateModified = fs.statSync(certPath).mtimeMs;
 setInterval(async () => {

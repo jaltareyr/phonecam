@@ -1,6 +1,9 @@
+import { captureCandidates, preferVideoCodec, bitrateCeiling, videoStats } from './stream-quality.js';
+
 const form = document.getElementById('pair-form');
 const statusElement = document.getElementById('status');
 const actualSettings = document.getElementById('actual-settings');
+const streamSettings = document.getElementById('stream-settings');
 const cameraSelect = document.getElementById('camera-select');
 const preview = document.getElementById('local-video');
 const controls = document.getElementById('camera-controls');
@@ -26,10 +29,14 @@ let preferredFacing = 'environment';
 let reconnectTimer;
 let retryDelay = 1000;
 let reconnectBlocked = false;
+let statsTimer;
+let previousStats;
+let stalledSamples = 0;
+let recoveryAttempted = false;
 
 function status(message) { statusElement.textContent = message; }
 function signal(message) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
-function closePeer() { peer?.close(); peer = null; pendingCandidates = []; }
+function closePeer() { clearInterval(statsTimer); previousStats = null; stalledSamples = 0; recoveryAttempted = false; peer?.close(); peer = null; pendingCandidates = []; }
 function videoTrack() { return stream?.getVideoTracks()[0]; }
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
@@ -83,8 +90,51 @@ function makePeer() {
       setTimeout(() => { if (peer === connection && connection.connectionState === 'disconnected') socket?.close(); }, 5000);
     }
   };
-  for (const track of stream.getTracks()) connection.addTrack(track, stream);
+  for (const track of stream.getTracks()) {
+    if (track.kind === 'video') track.contentHint = 'motion';
+    const sender = connection.addTrack(track, stream);
+    if (track.kind === 'video') {
+      const transceiver = connection.getTransceivers().find(item => item.sender === sender);
+      preferVideoCodec(transceiver, RTCRtpSender.getCapabilities?.('video')?.codecs);
+      const settings = track.getSettings();
+      const parameters = sender.getParameters();
+      if (parameters.encodings?.length) {
+        parameters.encodings[0].maxBitrate = bitrateCeiling(settings.width || 1280, settings.height || 720, settings.frameRate || 30);
+        sender.setParameters(parameters).catch(() => {});
+      }
+    }
+  }
+  statsTimer = setInterval(async () => {
+    if (peer !== connection || connection.connectionState !== 'connected') return;
+    try {
+      const current = videoStats(await connection.getStats(), 'outbound');
+      if (!current) return;
+      const bitrate = previousStats && current.timestamp > previousStats.timestamp
+        ? Math.round(8 * (current.bytes - previousStats.bytes) / (current.timestamp - previousStats.timestamp) * 1000 / 1_000_000 * 10) / 10 : 0;
+      streamSettings.textContent = `Sending: ${current.width || '?'} × ${current.height || '?'} · ${current.fps} fps · ${current.codec} · ${bitrate} Mb/s${current.qualityLimit && current.qualityLimit !== 'none' ? ` · limited by ${current.qualityLimit}` : ''}`;
+      stalledSamples = videoTrack()?.enabled && current.frames === 0 ? stalledSamples + 1 : 0;
+      if (stalledSamples >= 3 && !recoveryAttempted) {
+        recoveryAttempted = true;
+        await reduceQuality('High-resolution encoder stalled');
+      }
+      previousStats = current;
+    } catch { /* Stats are optional on older Android browsers. */ }
+  }, 2000);
   return connection;
+}
+
+async function reduceQuality(reason) {
+  const track = videoTrack();
+  const settings = track?.getSettings();
+  if (!settings) return;
+  const target = Math.max(settings.width || 0, settings.height || 0) > 1920 ? [1920, 1080] : [1280, 720];
+  status(`${reason}; retrying at ${target[1]}p…`);
+  try {
+    const portrait = (settings.height || 0) > (settings.width || 0);
+    const [width, height] = portrait ? [target[1], target[0]] : target;
+    await track.applyConstraints({ width: { ideal: width, max: width }, height: { ideal: height, max: height }, frameRate: { ideal: 30, max: 30 } });
+    showCapabilities();
+  } catch (error) { status(`Video recovery failed: ${error.message}`); }
 }
 
 function connect() {
@@ -121,6 +171,7 @@ function connect() {
         return;
       }
       if (message.type === 'control' && message.action === 'switch-camera') { await switchCamera(); return; }
+      if (message.type === 'control' && message.action === 'reduce-quality') { await reduceQuality('PC could not decode the high-resolution stream'); return; }
       if (message.type === 'control' && message.action === 'zoom') {
         const caps = videoTrack()?.getCapabilities?.();
         if (caps?.zoom && message.value >= caps.zoom.min && message.value <= caps.zoom.max) {
@@ -195,11 +246,9 @@ async function restartCapture() {
   const value = cameraSelect.value;
   const [width, height] = document.getElementById('resolution').value.split('x').map(Number);
   const frameRate = Number(document.getElementById('frame-rate').value);
-  const video = {
-    width: { ideal: width }, height: { ideal: height }, frameRate: { ideal: frameRate }
-  };
-  if (value.startsWith('device:')) video.deviceId = { exact: value.slice(7) };
-  else { video.facingMode = value.slice(7); preferredFacing = value.slice(7); }
+  const camera = value.startsWith('device:') ? { deviceId: { exact: value.slice(7) } }
+    : { facingMode: { ideal: value.slice(7) } };
+  if (!value.startsWith('device:')) preferredFacing = value.slice(7);
   if (stream) {
     stream.getTracks().forEach(track => track.stop());
     stream = null;
@@ -207,14 +256,13 @@ async function restartCapture() {
     await wait(300);
   }
   const alternateFacing = preferredFacing === 'user' ? 'environment' : 'user';
-  const lowQuality = { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 } };
-  const attempts = [video, { ...lowQuality, facingMode: { ideal: preferredFacing } },
-    { ...lowQuality, facingMode: { ideal: alternateFacing } }, lowQuality];
+  const attempts = [...captureCandidates(width, height, frameRate, camera),
+    { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 }, facingMode: { ideal: alternateFacing } }];
   let lastError;
   for (const [index, constraints] of attempts.entries()) {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: constraints, audio: false });
-      if (index) status(`Camera started with fallback settings (${index + 1}/${attempts.length})`);
+      if (index) status(`Camera started with the best available mode (${index + 1}/${attempts.length})`);
       break;
     } catch (error) {
       lastError = error;
@@ -235,6 +283,7 @@ async function restartCapture() {
   preview.srcObject = stream;
   await preview.play();
   showCapabilities();
+  streamSettings.textContent = 'Waiting for WebRTC stream measurements…';
   preferredFacing = videoTrack()?.getSettings().facingMode || preferredFacing;
   await listCameras();
 }

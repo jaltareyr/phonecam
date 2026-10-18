@@ -9,6 +9,8 @@ let serverProcess = null;
 let mainWindow = null;
 let feedWindow = null;
 let frameStore = null;
+let gpuInfoReady = false;
+app.on('gpu-info-update', () => { gpuInfoReady = true; });
 
 function openFrameFile() {
   const programData = process.env.ProgramData || 'C:\\ProgramData';
@@ -87,6 +89,7 @@ async function ensureServer() {
 async function createWindow() {
   await ensureServer();
   openFrameFile();
+  ipcMain.handle('phonecam-gpu-status', () => gpuInfoReady ? app.getGPUFeatureStatus().video_decode : 'checking');
   mainWindow = new BrowserWindow({
     width: 1060,
     height: 850,

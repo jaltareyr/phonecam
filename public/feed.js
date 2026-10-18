@@ -25,10 +25,12 @@ if (window.phoneCamDesktop?.onFeedFrame) {
   const drawFromOpener = () => {
     try {
       const source = window.opener?.phoneCamSelectedPreview?.();
-      if (source && source.width > 1 && source.height > 1) {
-        if (canvas.width !== source.width || canvas.height !== source.height) {
-          canvas.width = source.width;
-          canvas.height = source.height;
+      const width = source?.videoWidth || source?.width;
+      const height = source?.videoHeight || source?.height;
+      if (source && width > 1 && height > 1) {
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
         }
         context.drawImage(source, 0, 0);
         hint.hidden = true;

@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('phoneCamDesktop', {
   sendFrame(bytes) { ipcRenderer.send('phonecam-frame', bytes); },
   clearFrame() { ipcRenderer.send('phonecam-clear-frame'); },
+  gpuVideoDecodeStatus() { return ipcRenderer.invoke('phonecam-gpu-status'); },
   setAlwaysOnTop(enabled) { ipcRenderer.send('phonecam-always-on-top', Boolean(enabled)); },
   openFeedWindow() { ipcRenderer.send('phonecam-open-feed-window'); },
   toggleFullscreen() { ipcRenderer.send('phonecam-toggle-fullscreen'); },

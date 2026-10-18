@@ -1,3 +1,5 @@
+import { videoStats } from './stream-quality.js';
+
 const grid = document.getElementById('streams');
 const cameras = new Set();
 let selectedCamera = null;
@@ -7,7 +9,8 @@ const toolbarSnapshot = document.getElementById('toolbar-snapshot');
 const toolbarRecord = document.getElementById('toolbar-record');
 const toolbarSettings = document.getElementById('toolbar-settings');
 const toolbarMenu = document.getElementById('toolbar-menu');
-window.phoneCamSelectedPreview = () => selectedCamera?.preview || null;
+window.phoneCamSelectedPreview = () => selectedCamera
+  ? (processedOutput(selectedCamera) ? selectedCamera.preview : selectedCamera.source) : null;
 
 function closePanels() {
   document.body.classList.remove('connect-open', 'settings-open');
@@ -76,6 +79,10 @@ function selectCamera(camera) {
 }
 
 function stopPeer(camera) {
+  clearInterval(camera.statsTimer);
+  camera.previousStats = null;
+  camera.stalledSamples = 0;
+  camera.recoveryRequested = false;
   if (camera.recorder?.state === 'recording') camera.recorder.stop();
   camera.peer?.close();
   camera.peer = null;
@@ -99,6 +106,7 @@ function stopPeer(camera) {
   camera.preview.width = 1;
   camera.preview.height = 1;
   camera.details.textContent = 'Waiting for video';
+  camera.diagnostics.textContent = 'Waiting for phone video…';
   updateToolbar();
 }
 
@@ -118,33 +126,41 @@ function renderFrame(camera) {
   if (!cameras.has(camera)) return;
   const video = camera.source;
   const canvas = camera.preview;
+  const needsProcessing = processedOutput(camera);
+  camera.card.classList.toggle('direct-preview', !needsProcessing);
   if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
     const rotated = camera.rotation % 180 !== 0;
     const outputWidth = rotated ? video.videoHeight : video.videoWidth;
     const outputHeight = rotated ? video.videoWidth : video.videoHeight;
-    if (canvas.width !== outputWidth || canvas.height !== outputHeight) {
-      canvas.width = outputWidth;
-      canvas.height = outputHeight;
+    const processingScale = Math.min(1, 1920 / Math.max(outputWidth, outputHeight));
+    const processedWidth = Math.round(outputWidth * processingScale);
+    const processedHeight = Math.round(outputHeight * processingScale);
+    if (needsProcessing && (canvas.width !== processedWidth || canvas.height !== processedHeight)) {
+      canvas.width = processedWidth;
+      canvas.height = processedHeight;
       canvas.style.aspectRatio = `${outputWidth} / ${outputHeight}`;
     }
-    const ctx = canvas.getContext('2d', { alpha: false });
-    ctx.save();
-    if (camera.mirrored) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
-    if (camera.rotation === 90) { ctx.translate(canvas.width, 0); ctx.rotate(Math.PI / 2); }
-    else if (camera.rotation === 180) { ctx.translate(canvas.width, canvas.height); ctx.rotate(Math.PI); }
-    else if (camera.rotation === 270) { ctx.translate(0, canvas.height); ctx.rotate(-Math.PI / 2); }
-    const filter = camera.effect.value;
-    ctx.filter = videoFilter(camera);
-    if (filter === 'pixel') {
-      const small = camera.pixelCanvas;
-      small.width = Math.max(1, Math.round(video.videoWidth / 24));
-      small.height = Math.max(1, Math.round(video.videoHeight / 24));
-      small.getContext('2d').drawImage(video, 0, 0, small.width, small.height);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(small, 0, 0, video.videoWidth, video.videoHeight);
-    } else ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-    ctx.restore();
-    if (camera.overlayImage) ctx.drawImage(camera.overlayImage, 0, 0, canvas.width, canvas.height);
+    if (needsProcessing) {
+      const ctx = canvas.getContext('2d', { alpha: false });
+      ctx.save();
+      ctx.scale(processingScale, processingScale);
+      if (camera.mirrored) { ctx.translate(outputWidth, 0); ctx.scale(-1, 1); }
+      if (camera.rotation === 90) { ctx.translate(outputWidth, 0); ctx.rotate(Math.PI / 2); }
+      else if (camera.rotation === 180) { ctx.translate(outputWidth, outputHeight); ctx.rotate(Math.PI); }
+      else if (camera.rotation === 270) { ctx.translate(0, outputHeight); ctx.rotate(-Math.PI / 2); }
+      const filter = camera.effect.value;
+      ctx.filter = videoFilter(camera);
+      if (filter === 'pixel') {
+        const small = camera.pixelCanvas;
+        small.width = Math.max(1, Math.round(video.videoWidth / 24));
+        small.height = Math.max(1, Math.round(video.videoHeight / 24));
+        small.getContext('2d').drawImage(video, 0, 0, small.width, small.height);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(small, 0, 0, video.videoWidth, video.videoHeight);
+      } else ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+      ctx.restore();
+      if (camera.overlayImage) ctx.drawImage(camera.overlayImage, 0, 0, canvas.width, canvas.height);
+    }
     if (camera === selectedCamera && window.phoneCamDesktop?.sendFrame &&
         performance.now() - (camera.lastExport || 0) >= 33) {
       camera.lastExport = performance.now();
@@ -152,10 +168,13 @@ function renderFrame(camera) {
       const bridgeContext = bridge.getContext('2d', { alpha: false, willReadFrequently: true });
       bridgeContext.fillStyle = '#000';
       bridgeContext.fillRect(0, 0, bridge.width, bridge.height);
-      const scale = Math.min(bridge.width / canvas.width, bridge.height / canvas.height);
-      const width = canvas.width * scale;
-      const height = canvas.height * scale;
-      bridgeContext.drawImage(canvas, (bridge.width - width) / 2, (bridge.height - height) / 2, width, height);
+      const source = needsProcessing ? canvas : video;
+      const sourceWidth = needsProcessing ? canvas.width : video.videoWidth;
+      const sourceHeight = needsProcessing ? canvas.height : video.videoHeight;
+      const scale = Math.min(bridge.width / sourceWidth, bridge.height / sourceHeight);
+      const width = sourceWidth * scale;
+      const height = sourceHeight * scale;
+      bridgeContext.drawImage(source, (bridge.width - width) / 2, (bridge.height - height) / 2, width, height);
       window.phoneCamDesktop.sendFrame(bridgeContext.getImageData(0, 0, bridge.width, bridge.height).data);
     }
   }
@@ -201,6 +220,29 @@ function makePeer(camera) {
       }, 5000);
     }
   };
+  camera.statsTimer = setInterval(async () => {
+    if (camera.peer !== peer || peer.connectionState !== 'connected') return;
+    try {
+      const current = videoStats(await peer.getStats(), 'inbound');
+      if (!current) return;
+      const previous = camera.previousStats;
+      const bitrate = previous && current.timestamp > previous.timestamp
+        ? Math.max(0, 8 * (current.bytes - previous.bytes) / (current.timestamp - previous.timestamp) / 1000).toFixed(1) : '0.0';
+      const dimensions = `${current.width || camera.source.videoWidth || '?'} × ${current.height || camera.source.videoHeight || '?'}`;
+      const stalled = previous && current.frames !== null && previous.frames !== null && current.frames <= previous.frames;
+      camera.diagnostics.textContent = `${dimensions} · ${current.fps} fps · ${current.codec} · ${bitrate} Mb/s${current.packetsLost ? ` · ${current.packetsLost} lost packets` : ''}${current.framesDropped ? ` · ${current.framesDropped} dropped frames` : ''}${stalled ? ' · video stalled' : ''}`;
+      camera.details.textContent = camera.diagnostics.textContent;
+      camera.previousStats = current;
+      camera.stalledSamples = stalled && !camera.paused && !camera.source.videoWidth ? camera.stalledSamples + 1 : 0;
+      if (camera.stalledSamples >= 3 && !camera.recoveryRequested) {
+        camera.recoveryRequested = true;
+        signal(camera, { type: 'control', action: 'reduce-quality' });
+        status(camera, 'Video stalled · requesting a lower stream mode');
+      }
+      if (stalled && camera.stream) status(camera, 'Connected · waiting for video frames');
+      else if (camera.status.textContent.includes('waiting for video frames')) status(camera, 'Connected');
+    } catch { /* WebRTC stats may be unavailable on older browser versions. */ }
+  }, 2000);
   return peer;
 }
 
@@ -277,7 +319,13 @@ async function newCode(camera) {
   if (!response.ok) throw new Error('Could not create a pairing code');
   camera.code = (await response.json()).code;
   camera.codeElement.textContent = camera.code;
+  updatePairQr(camera);
   connect(camera);
+}
+
+function updatePairQr(camera) {
+  camera.pairQr.hidden = !camera.wifiAddressValue || !camera.code;
+  if (!camera.pairQr.hidden) camera.pairQr.src = `/api/qr?address=${encodeURIComponent(camera.wifiAddressValue)}&code=${camera.code}`;
 }
 
 function download(blob, extension) {
@@ -290,8 +338,15 @@ function download(blob, extension) {
 }
 
 function snapshot(camera) {
-  if (!camera.stream || camera.preview.width <= 1) return;
-  camera.preview.toBlob(blob => { if (blob) download(blob, 'png'); }, 'image/png');
+  if (!camera.stream || !camera.source.videoWidth) return;
+  const source = processedOutput(camera) ? camera.preview : camera.source;
+  const width = source.videoWidth || source.width;
+  const height = source.videoHeight || source.height;
+  const snapshotCanvas = document.createElement('canvas');
+  snapshotCanvas.width = width;
+  snapshotCanvas.height = height;
+  snapshotCanvas.getContext('2d').drawImage(source, 0, 0, width, height);
+  snapshotCanvas.toBlob(blob => { if (blob) download(blob, 'png'); }, 'image/png');
 }
 
 function toggleRecording(camera) {
@@ -345,7 +400,9 @@ async function showConnection(camera) {
     if (!response.ok) throw new Error('Could not read network information');
     const info = await response.json();
     const preferred = info.wifi.find(item => item.certificateMatches) || info.wifi[0];
+    camera.wifiAddressValue = preferred?.address || '';
     camera.wifiUrl = preferred?.url || '';
+    updatePairQr(camera);
     camera.wifiAddress.textContent = preferred?.url || 'No Wi-Fi address found';
     camera.wifiNote.textContent = !info.tlsReady ? 'Wi-Fi setup needs a local HTTPS certificate.'
       : !preferred ? 'Connect this PC to Wi-Fi to show an address.'
@@ -360,6 +417,8 @@ async function showConnection(camera) {
     camera.copyButton.disabled = !preferred;
     camera.usbAddress.textContent = info.usbUrl;
   } catch (error) {
+    camera.wifiAddressValue = '';
+    updatePairQr(camera);
     camera.wifiAddress.textContent = 'Wi-Fi address unavailable';
     camera.wifiNote.textContent = error.message;
   }
@@ -386,9 +445,12 @@ function addCamera() {
   card.querySelector('.effect-row').insertAdjacentHTML('afterend', `<details class="color-panel"><summary>Color and overlay</summary><div class="color-grid"><label>Brightness <input data-color="brightness" data-default="100" type="range" min="0" max="200" value="100"></label><label>Contrast <input data-color="contrast" data-default="100" type="range" min="0" max="200" value="100"></label><label>Saturation <input data-color="saturation" data-default="100" type="range" min="0" max="200" value="100"></label><label>Hue <input data-color="hue" data-default="0" type="range" min="-180" max="180" value="0"></label></div><label class="overlay-label">Overlay image <input class="overlay-file" type="file" accept="image/*"></label><button type="button" class="remove-overlay secondary">Remove overlay</button><button type="button" class="reset-color secondary">Reset color</button></details>`);
   card.querySelector('.effect-row').insertAdjacentHTML('afterend', '<div class="pc-zoom"><label>Phone zoom <input class="pc-zoom-input" type="range" min="1" max="2" step="0.1" value="1" disabled></label><span class="pc-zoom-value">Unavailable</span></div><p class="focus-hint">Tap focus unavailable on this phone</p>');
   card.querySelector('.capture-bar').insertAdjacentHTML('beforeend', '<button class="cancel-recording secondary" disabled>Discard recording</button>');
+  card.querySelector('.control-panel .panel-title').insertAdjacentHTML('afterend', '<p class="stream-diagnostics small">Waiting for phone video…</p>');
+  card.querySelector('.stream-diagnostics').insertAdjacentHTML('afterend', '<p class="gpu-diagnostics small">GPU video decode: checking…</p>');
+  card.querySelector('.wifi-address').insertAdjacentHTML('afterend', '<img class="pair-qr" alt="Scan with Android camera to open PhoneCam with this pairing code" hidden>');
   const camera = {
     card, codeElement: card.querySelector('.code'), status: card.querySelector('.status'),
-    details: card.querySelector('.details'), source: card.querySelector('video'),
+    details: card.querySelector('.details'), diagnostics: card.querySelector('.stream-diagnostics'), source: card.querySelector('video'),
     preview: card.querySelector('canvas'), audio: card.querySelector('audio'),
     recordButton: card.querySelector('.record'), snapshotButton: card.querySelector('.snapshot'),
     cancelButton: card.querySelector('.cancel-recording'), colorInputs: card.querySelectorAll('[data-color]'),
@@ -396,7 +458,7 @@ function addCamera() {
     focusHint: card.querySelector('.focus-hint'), focusSupported: false,
     pauseButton: card.querySelector('.pause'), audioButton: card.querySelector('.audio-button'),
     switchButton: card.querySelector('.switch-camera'),
-    wifiAddress: card.querySelector('.wifi-address'), wifiNote: card.querySelector('.wifi-note'),
+    wifiAddress: card.querySelector('.wifi-address'), wifiNote: card.querySelector('.wifi-note'), pairQr: card.querySelector('.pair-qr'),
     usbAddress: card.querySelector('.usb-address'), copyButton: card.querySelector('.copy-link'),
     effect: card.querySelector('.effect'), pixelCanvas: document.createElement('canvas'),
     bridgeCanvas: document.createElement('canvas'),
@@ -406,6 +468,14 @@ function addCamera() {
   camera.bridgeCanvas.height = 720;
   cameras.add(camera);
   grid.append(card);
+  if (window.phoneCamDesktop?.gpuVideoDecodeStatus) {
+    let checks = 0;
+    const checkGpu = () => window.phoneCamDesktop.gpuVideoDecodeStatus().then(value => {
+      card.querySelector('.gpu-diagnostics').textContent = `GPU video decode: ${value} (system capability)`;
+      if (value === 'checking' && checks++ < 5) setTimeout(checkGpu, 2000);
+    }).catch(() => {});
+    checkGpu();
+  }
   selectCamera(camera);
   renderFrame(camera);
   card.onclick = () => selectCamera(camera);
@@ -430,9 +500,9 @@ function addCamera() {
     camera.zoomValue.textContent = `${Number(camera.zoomInput.value).toFixed(1)}×`;
     signal(camera, { type: 'control', action: 'zoom', value: Number(camera.zoomInput.value) });
   };
-  camera.preview.onclick = event => {
+  card.querySelector('.preview-shell').onclick = event => {
     if (!camera.focusSupported) return;
-    const bounds = camera.preview.getBoundingClientRect();
+    const bounds = (processedOutput(camera) ? camera.preview : camera.source).getBoundingClientRect();
     let u = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
     const v = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
     if (camera.mirrored) u = 1 - u;

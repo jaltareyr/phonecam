@@ -66,6 +66,8 @@ test('pairs two peers and relays signaling', async () => {
     assert.deepEqual(await nextPhone(), { type: 'control', action: 'pause', enabled: true });
     viewer.send(JSON.stringify({ type: 'control', action: 'switch-camera' }));
     assert.deepEqual(await nextPhone(), { type: 'control', action: 'switch-camera' });
+    viewer.send(JSON.stringify({ type: 'control', action: 'reduce-quality' }));
+    assert.deepEqual(await nextPhone(), { type: 'control', action: 'reduce-quality' });
     const cameraState = { type: 'camera-state', zoom: { min: 1, max: 5, step: 0.1, value: 2 }, focusSupported: true };
     phone.send(JSON.stringify(cameraState));
     assert.deepEqual(await nextViewer(), cameraState);
@@ -109,6 +111,13 @@ test('pairs two peers and relays signaling', async () => {
     assert.equal((await fetch(`${base}/feed`)).status, 200);
     assert.equal((await fetch(`${base}/feed.js`)).status, 200);
     assert.equal((await fetch(`${base}/phone.js`)).status, 200);
+    assert.equal((await fetch(`${base}/stream-quality.js`)).status, 200);
+    const connectivity = await (await fetch(`${base}/api/connectivity`)).json();
+    if (connectivity.wifi.length) {
+      const qr = await fetch(`${base}/api/qr?address=${encodeURIComponent(connectivity.wifi[0].address)}&code=${code}`);
+      assert.equal(qr.status, 200);
+      assert.match(await qr.text(), /<svg/);
+    }
   } finally {
     for (const socket of sockets) socket.terminate();
     await new Promise(resolve => { child.once('exit', resolve); child.kill(); });
