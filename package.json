@@ -9,6 +9,7 @@
   "bugs": { "url": "https://github.com/jaltareyr/phonecam/issues" },
   "keywords": ["android", "webcam", "windows", "webrtc", "virtual-camera", "wifi", "usb", "open-source"],
   "engines": { "node": ">=22.12.0" },
+  "overrides": { "global-agent": "4.1.3" },
   "private": true,
   "type": "module",
   "main": "desktop/main.cjs",

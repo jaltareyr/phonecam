@@ -11,13 +11,18 @@ Windows 11 x64; source browser preview is not itself a webcam device.
 npm run check
 npm test
 npm run test:desktop
-npm audit --omit=dev
+npm audit
 ```
 
 Tests generate disposable private CAs and bind ephemeral ports. They wait for
 both listeners to announce readiness. They do not use the developer's certificate
 directory or publish a discovery service. The automated suite uses simulated
 signaling, not personal camera/audio input.
+
+The `global-agent` override keeps the build downloader's proxy helper on version
+4, which removes the deprecated logging chain containing the vulnerable
+`sprintf-js` dependency. Check both full and production audits when updating build
+tools; do not remove the override without checking the resulting dependency tree.
 
 ## Windows release prerequisites
 
