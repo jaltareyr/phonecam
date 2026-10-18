@@ -39,6 +39,7 @@ let socket;
 let peer;
 let stream;
 let code;
+let resumeToken;
 let pendingCandidates = [];
 let preferredFacing = 'environment';
 let reconnectTimer;
@@ -185,17 +186,19 @@ async function reduceQuality(reason) {
 function connect() {
   const current = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/signal`);
   socket = current;
-  current.onopen = () => { retryDelay = 1000; signal({ type: 'join', role: 'phone', code }); };
+  current.onopen = () => { retryDelay = 1000; signal({ type: 'join', role: 'phone', code, resumeToken }); };
   current.onmessage = async event => {
+    if (socket !== current) return;
     const message = JSON.parse(event.data);
     try {
       if (message.type === 'error') {
         status(message.message);
-        if (message.message.includes('Pairing code unavailable')) { reconnectBlocked = true; current.close(); }
+        if (/Pairing code unavailable|declined on PC|Session ended|Too many pairing/.test(message.message)) { reconnectBlocked = true; current.close(); }
         return;
       }
-      if (message.type === 'joined') { status('Waiting for PC…'); return; }
+      if (message.type === 'joined') { status('Waiting for approval in the PC app…'); return; }
       if (message.type === 'paired') {
+        resumeToken = message.resumeToken;
         status('Pairing…');
         sendCameraState();
         const pc = makePeer();
@@ -375,7 +378,9 @@ form.onsubmit = async event => {
   reconnectTimer = null;
   retryDelay = 1000;
   reconnectBlocked = false;
-  code = document.getElementById('pair-code').value.toUpperCase().trim();
+  const nextCode = document.getElementById('pair-code').value.toUpperCase().trim();
+  if (nextCode !== code) resumeToken = undefined;
+  code = nextCode;
   if (!/^[A-HJ-NP-Z2-9]{6}$/.test(code)) { status('Enter the six-character code on your PC'); return; }
   try {
     localStorage.setItem('phonecam-camera-settings', JSON.stringify({

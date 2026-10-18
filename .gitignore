@@ -10,3 +10,13 @@ native/virtual-camera/packages/
 native/virtual-camera/x64/
 native/virtual-camera/media-source/x64/
 native/virtual-camera/media-source/obj/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+frame.bin
+.DS_Store
+Thumbs.db

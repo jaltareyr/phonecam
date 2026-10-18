@@ -71,6 +71,7 @@ function status(camera, message) {
 }
 
 function selectCamera(camera) {
+  if (selectedCamera === camera) return;
   for (const item of cameras) item.card.classList.toggle('selected', item === camera);
   selectedCamera = camera;
   document.querySelector('.connection-label').lastChild.textContent = ` ${camera.status.textContent}`;
@@ -79,6 +80,7 @@ function selectCamera(camera) {
 }
 
 function stopPeer(camera) {
+  camera.card.querySelector('.pair-request').hidden = true;
   clearInterval(camera.statsTimer);
   camera.previousStats = null;
   camera.stalledSamples = 0;
@@ -178,7 +180,9 @@ function renderFrame(camera) {
       window.phoneCamDesktop.sendFrame(bridgeContext.getImageData(0, 0, bridge.width, bridge.height).data);
     }
   }
-  camera.frameRequest = requestAnimationFrame(() => renderFrame(camera));
+  // Camera consumers need frames even when Windows stops painting our window.
+  // requestAnimationFrame can stop with the compositor when minimized/occluded.
+  camera.frameTimer = setTimeout(() => renderFrame(camera), 33);
 }
 
 function makePeer(camera) {
@@ -258,21 +262,31 @@ function connect(camera) {
   camera.socket = socket;
   socket.onopen = () => {
     camera.retryDelay = 1000;
-    signal(camera, { type: 'join', role: 'viewer', code: camera.code });
+    signal(camera, { type: 'join', role: 'viewer', code: camera.code, viewerToken: camera.viewerToken });
   };
   socket.onmessage = async event => {
+    if (camera.socket !== socket) return;
     const message = JSON.parse(event.data);
     try {
       if (message.type === 'error') {
         status(camera, message.message);
-        if (message.message.includes('Pairing code unavailable')) {
+        if (/Pairing code unavailable|Session ended|Too many pairing/.test(message.message)) {
           camera.reconnectBlocked = true;
           socket.close();
         }
         return;
       }
       if (message.type === 'joined') { status(camera, 'Waiting for phone…'); return; }
-      if (message.type === 'paired') { status(camera, 'Pairing…'); return; }
+      if (message.type === 'pair-request') {
+        camera.card.querySelector('.pair-request').hidden = false;
+        status(camera, 'Approve the phone connection');
+        return;
+      }
+      if (message.type === 'paired') {
+        camera.card.querySelector('.pair-request').hidden = true;
+        if (camera === selectedCamera) closePanels();
+        status(camera, 'Pairing…'); return;
+      }
       if (message.type === 'camera-state') {
         const zoom = message.zoom;
         if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) &&
@@ -310,14 +324,19 @@ function connect(camera) {
 }
 
 async function newCode(camera) {
+  signal(camera, { type: 'end-session' });
+  camera.socket?.close();
+  camera.socket = null;
   clearTimeout(camera.retryTimer);
   camera.retryTimer = null;
   camera.retryDelay = 1000;
   camera.reconnectBlocked = false;
   stopPeer(camera);
-  const response = await fetch('/api/room', { method: 'POST' });
+  const response = await fetch('/api/room', { method: 'POST', headers: { 'X-PhoneCam-Client': 'viewer' } });
   if (!response.ok) throw new Error('Could not create a pairing code');
-  camera.code = (await response.json()).code;
+  const room = await response.json();
+  camera.code = room.code;
+  camera.viewerToken = room.viewerToken;
   camera.codeElement.textContent = camera.code;
   updatePairQr(camera);
   connect(camera);
@@ -438,6 +457,15 @@ function addCamera() {
   const card = document.createElement('section');
   card.className = 'card camera-card';
   card.innerHTML = `<div class="camera-layout"><div class="video-column"><div class="preview-heading"><div><strong>Live preview</strong><span class="details small">Waiting for video</span></div><div class="preview-actions"><button class="popout-feed secondary" type="button">Open feed window</button><button class="danger remove" type="button">Remove camera</button></div></div><div class="preview-shell"><video class="source-video" autoplay muted playsinline></video><canvas class="preview"></canvas><button class="exit-feed-fullscreen" type="button">Exit fullscreen</button><div class="empty-state"><div class="connection-art" aria-hidden="true"><span class="phone-art"></span><span class="connection-waves">◌ ◌</span><span class="monitor-art"></span></div><strong>Waiting for phone</strong><span>Use the connection button below to pair your phone</span></div></div><div class="camera-state"><span class="state-dot"></span><span class="status">Creating room…</span></div><audio autoplay muted></audio><div class="control-panel"><div class="panel-title">Camera controls</div><div class="control-grid"><button class="switch-camera secondary" disabled>⇄ <span>Switch camera</span></button><button class="mirror secondary" aria-pressed="false">⇋ <span>Mirror</span></button><button class="rotate secondary">⟳ <span>Rotate 90°</span></button><button class="pause secondary" disabled>⏸ <span>Pause</span></button><button class="audio-button secondary" disabled>♪ <span>Unmute</span></button></div><div class="effect-row"><label class="label">Video effect</label><select class="effect"><option value="none">None</option><option value="mono">Monochrome</option><option value="warm">Warm</option><option value="soft">Soft focus</option><option value="pixel">Mosaic</option></select></div></div><div class="capture-bar"><button class="snapshot secondary" disabled>◎ Snapshot</button><button class="record secondary" disabled>● Record</button></div></div><aside class="connect-panel"><div class="panel-title">Connect your phone</div><p class="connect-intro">Choose how your Android phone reaches this PC.</p><div class="mode-tabs" role="tablist" aria-label="Connection method"><button type="button" data-mode="wifi" class="active" role="tab" aria-selected="true">◉ Wi-Fi</button><button type="button" data-mode="usb" role="tab" aria-selected="false">⚡ USB</button></div><div class="wifi-instructions"><div class="step"><b>1</b><div><strong>Same Wi-Fi</strong><p>Connect your phone and this PC to the same network.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address wifi-address">Finding PC address…</div><button type="button" class="copy-link secondary">Copy address</button><p class="wifi-note"></p></div></div></div><div class="usb-instructions" hidden><div class="step"><b>1</b><div><strong>Connect USB cable</strong><p>Enable USB debugging, then allow this PC on your phone.</p></div></div><div class="step"><b>2</b><div><strong>Open on Android Chrome</strong><div class="address usb-address">http://localhost:8080/phone</div><p>ADB reverse forwarding must be active on this PC.</p></div></div></div><div class="step code-step"><b>3</b><div><strong>Enter this pairing code</strong><div class="code">······</div><button class="new-code secondary" type="button">Get new code</button></div></div><p class="connect-footer">Allow camera access on your phone and tap <strong>Start camera</strong>. The live feed will appear here.</p></aside></div>`;
+  card.querySelector('.video-column').insertAdjacentHTML('beforeend', '<section class="pair-request" role="alert" hidden><strong>Allow this phone to connect?</strong><p>Accept only if you just scanned this PC’s QR code or entered its pairing code on your phone.</p><div><button type="button" class="pair-accept">Accept phone</button><button type="button" class="pair-decline">Decline</button></div></section>');
+  for (const [selector, approve] of [['.pair-accept', true], ['.pair-decline', false]]) {
+    card.querySelector(selector).onclick = event => {
+      event.stopPropagation();
+      signal(camera, { type: 'pair-decision', approve });
+      card.querySelector('.pair-request').hidden = true;
+      if (!approve) status(camera, 'Phone connection declined');
+    };
+  }
   for (const panel of card.querySelectorAll('.control-panel,.connect-panel')) {
     panel.insertAdjacentHTML('afterbegin', '<button type="button" class="panel-close" aria-label="Close panel">×</button>');
     panel.querySelector('.panel-close').onclick = closePanels;
@@ -536,13 +564,14 @@ function addCamera() {
   card.querySelector('.rotate').onclick = () => { camera.rotation = (camera.rotation + 90) % 360; card.querySelector('.rotate span').textContent = `Rotate ${camera.rotation}°`; };
   card.querySelector('.new-code').onclick = () => newCode(camera).catch(error => status(camera, error.message));
   card.querySelector('.remove').onclick = () => {
+    signal(camera, { type: 'end-session' });
     clearTimeout(camera.retryTimer);
     camera.reconnectBlocked = true;
     camera.recorder?.state === 'recording' && camera.recorder.stop();
     camera.socket?.close();
     stopPeer(camera);
     cameras.delete(camera);
-    cancelAnimationFrame(camera.frameRequest);
+    clearTimeout(camera.frameTimer);
     card.remove();
     if (selectedCamera === camera) {
       const next = cameras.values().next().value;

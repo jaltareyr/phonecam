@@ -1,0 +1,28 @@
+name: Device compatibility report
+description: Share measured success or failure on a phone and Windows camera consumer.
+labels: [device-testing]
+body:
+  - type: textarea
+    id: device
+    attributes:
+      label: Device and app versions
+      description: PhoneCam version, Windows build/GPU, Android/model, Chrome, and camera consumer/version.
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options: [Wi-Fi, USB via ADB, Both]
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What worked and failed?
+      description: Include preview vs virtual-camera behavior, approval, rotate/mirror, minimized operation, call length, requested and actual modes, and measured latency/drop/reconnect results.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: "Keep private media, pairing codes, IP addresses, certificates, and keys out of this public report."

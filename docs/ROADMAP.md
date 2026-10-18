@@ -2,7 +2,7 @@
 
 The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEATURE_AUDIT.md). A built component is not counted as complete until its phone-to-Windows acceptance test passes.
 
-## Current baseline (0.5.0)
+## Current baseline (0.7.0 public alpha)
 
 - [x] Android browser camera capture and WebRTC preview on a physical phone
 - [x] Local pairing server, separate pairing rooms, and signaling test
@@ -20,6 +20,10 @@ The full parity inventory and evidence are in [IVCAM_FEATURE_AUDIT.md](IVCAM_FEA
 - [x] Prefer available H.264 WebRTC codecs, set resolution-aware bitrate ceilings, and display actual encoded/received stream statistics
 - [x] Use direct video preview for unprocessed streams and retry stalled high-resolution encoding at 1080p
 - [x] Show Windows GPU video decode capability status in camera settings
+- [x] Desktop-only viewer credential, approval of new phones, bounded signaling, and isolated integration tests
+- [x] Timer-driven frame export while hidden, complete-frame retention during writes, and signed RGB row handling
+- [x] MIT license, contributor/security guides, issue forms, CI, and alpha release workflow
+- [x] Synthetic desktop stream/hidden-window test and native frame snapshot regression tests
 - [ ] Verify Windows Camera, Zoom, Teams, OBS, and browser selection
 - [ ] Complete a stable 30-minute USB and Wi-Fi call with measured latency, dropped frames, and reconnect time
 

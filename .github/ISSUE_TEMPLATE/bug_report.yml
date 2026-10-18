@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a reproducible PhoneCam problem.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "For security defects use Security → Report a vulnerability. Do not upload private camera/audio content, pairing codes, certificates, or keys."
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include expected behavior and exact redacted errors.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Versions and connection
+      description: PhoneCam version, Windows build, Android/model, Chrome, Wi-Fi or USB, and camera consumer/version.
+    validations:
+      required: true
+  - type: textarea
+    id: stats
+    attributes:
+      label: Capture and stream details
+      description: Requested mode, Actual/Sending/Received resolution, codec, fps, and whether the phone and PC previews work.

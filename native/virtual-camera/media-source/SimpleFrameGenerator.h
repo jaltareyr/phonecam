@@ -5,6 +5,7 @@
 #pragma once
 #ifndef SIMPLE_FRAME_GENERATOR_H
 #define SIMPLE_FRAME_GENERATOR_H
+#include "FrameSnapshot.h"
 
 class SimpleFrameGenerator
 {
@@ -39,6 +40,8 @@ private:
     UINT32 m_width = 0;
     UINT32 m_height = 0;
     GUID m_subType = GUID_NULL;
+    phonecam::FrameSnapshot m_snapshot;
+    std::vector<BYTE> m_rgbScratch;
 
 };
 

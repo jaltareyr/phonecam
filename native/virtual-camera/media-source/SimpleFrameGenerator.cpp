@@ -9,17 +9,7 @@
 #pragma comment(lib, "Shell32.lib")
 
 namespace {
-constexpr DWORD frameWidth = 1280;
-constexpr DWORD frameHeight = 720;
-constexpr DWORD frameBytes = frameWidth * frameHeight * 4;
-
-struct FrameFile {
-    volatile LONG sequence;
-    DWORD width;
-    DWORD height;
-    DWORD timestampMs;
-    BYTE rgba[frameBytes];
-};
+using FrameFile = phonecam::SharedFrame;
 
 FrameFile* openFrameFile()
 {
@@ -42,42 +32,14 @@ FrameFile* openFrameFile()
     return frame;
 }
 
-bool copyLiveFrame(BYTE* output, DWORD length, LONG pitch, DWORD width, DWORD height, ULONG mask)
+DWORD currentTimestamp()
 {
-    FrameFile* frame = openFrameFile();
-    // RGB surfaces may have a negative stride. Lock2DSize still points output at
-    // the top visible row, so each following row is output + row * pitch.
-    const auto stride = static_cast<ULONGLONG>(std::abs(pitch));
-    if (!frame || width != frameWidth || height != frameHeight ||
-        stride < width * 4 || stride * height > length) return false;
     FILETIME nowFileTime;
     GetSystemTimeAsFileTime(&nowFileTime);
     ULARGE_INTEGER now{};
     now.LowPart = nowFileTime.dwLowDateTime;
     now.HighPart = nowFileTime.dwHighDateTime;
-    const DWORD nowMs = static_cast<DWORD>((now.QuadPart - 116444736000000000ULL) / 10000);
-    for (int attempt = 0; attempt < 3; ++attempt) {
-        const LONG before = frame->sequence;
-        if (before & 1) continue;
-        MemoryBarrier();
-        if (frame->width != width || frame->height != height ||
-            nowMs - frame->timestampMs > 5000) return false;
-        for (DWORD row = 0; row < height; ++row) {
-            const BYTE* source = frame->rgba + row * width * 4;
-            BYTE* target = output + row * pitch;
-            for (DWORD column = 0; column < width; ++column) {
-                target[0] = source[2] & static_cast<BYTE>(mask);
-                target[1] = source[1] & static_cast<BYTE>(mask >> 8);
-                target[2] = source[0] & static_cast<BYTE>(mask >> 16);
-                target[3] = 0xff;
-                source += 4;
-                target += 4;
-            }
-        }
-        MemoryBarrier();
-        if (before == frame->sequence) return true;
-    }
-    return false;
+    return static_cast<DWORD>((now.QuadPart - 116444736000000000ULL) / 10000);
 }
 }
 
@@ -91,14 +53,17 @@ HRESULT SimpleFrameGenerator::Initialize(_In_ IMFMediaType* pMediaType)
         RETURN_HR_MSG(MF_E_UNSUPPORTED_FORMAT, "Unsupported format: %s", winrt::to_hstring(m_subType).data());
     }
     MFGetAttributeSize(pMediaType, MF_MT_FRAME_SIZE, &m_width, &m_height);
+    try {
+        m_snapshot.initialize();
+        m_rgbScratch.resize(phonecam::frameBytes);
+    } catch (const std::bad_alloc&) { return E_OUTOFMEMORY; }
 
     return S_OK;
 }
 
 /*:
    Writes to a buffer representing a 2D image.
-   Writes a different constant to each line based on row number and current time.
-   Assumes top down image, no negative stride and pBuf points to the begnning of the buffer of length len.
+   pBuf is scanline zero from Lock2DSize; RGB images may have negative stride.
    Param:
    pBuf - pointer to beginning of buffer
    pitch - line length in bytes
@@ -120,12 +85,9 @@ HRESULT SimpleFrameGenerator::CreateFrame(
     {
         DEBUG_MSG(L"NV12 frames %s \n", winrt::to_hstring(MFVideoFormat_NV12).data());
 
-        DWORD frameBuffLen = m_width * m_height * 4;
-        wil::unique_cotaskmem_ptr<BYTE[]> spBuff = wil::make_unique_cotaskmem_nothrow<BYTE[]>(frameBuffLen);
-        RETURN_IF_NULL_ALLOC(spBuff.get());
-
-        RETURN_IF_FAILED(_CreateRGB32Frame(spBuff.get(), frameBuffLen, m_width * 4, m_width, m_height, rgbMask));
-        RETURN_IF_FAILED(RGB32ToNV12Frame(spBuff.get(), frameBuffLen, m_width * 4, m_width, m_height, pBuf, len, pitch));
+        const DWORD frameBuffLen = static_cast<DWORD>(m_rgbScratch.size());
+        RETURN_IF_FAILED(_CreateRGB32Frame(m_rgbScratch.data(), frameBuffLen, m_width * 4, m_width, m_height, rgbMask));
+        RETURN_IF_FAILED(RGB32ToNV12Frame(m_rgbScratch.data(), frameBuffLen, m_width * 4, m_width, m_height, pBuf, len, pitch));
     }
     else
     {
@@ -147,16 +109,18 @@ HRESULT SimpleFrameGenerator::_CreateRGB32Frame(
     _In_ ULONG rgbMask )
 {
     RETURN_HR_IF_NULL(E_INVALIDARG, pBuf);
-    if (len < (abs(pitch) * height ))
+    if (width != phonecam::frameWidth || height != phonecam::frameHeight ||
+        !phonecam::FrameSnapshot::validLayout(len, pitch))
     {
         return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
     }
 
-    if (copyLiveFrame(pBuf, len, pitch, width, height, rgbMask)) return S_OK;
+    if (m_snapshot.read(openFrameFile(), currentTimestamp(), [] { MemoryBarrier(); }) &&
+        m_snapshot.writeBgra(pBuf, len, pitch, rgbMask)) return S_OK;
 
     // A stopped or disconnected phone shows black rather than an old frame.
     for (DWORD row = 0; row < height; ++row) {
-        ZeroMemory(pBuf + row * pitch, width * 4);
+        ZeroMemory(pBuf + static_cast<ptrdiff_t>(row) * pitch, width * 4);
     }
     return S_OK;
 }

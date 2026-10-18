@@ -1,18 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import net from 'node:net';
 import { once } from 'node:events';
 import WebSocket from 'ws';
-
-async function freePort() {
-  const server = net.createServer();
-  server.listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  const port = server.address().port;
-  await new Promise(resolve => server.close(resolve));
-  return port;
-}
+import { startTestServer } from '../support/server-fixture.js';
 
 function messages(socket) {
   const queue = [];
@@ -25,38 +15,30 @@ function messages(socket) {
   return () => queue.length ? Promise.resolve(queue.shift()) : new Promise(resolve => waiters.push(resolve));
 }
 
-test('pairs two peers and relays signaling', async () => {
-  const port = await freePort();
-  const child = spawn(process.execPath, ['server.js'], {
-    cwd: new URL('..', import.meta.url),
-    env: { ...process.env, PHONECAM_HTTP_PORT: String(port), PHONECAM_HTTPS_PORT: '0' },
-    stdio: 'ignore'
-  });
-  const base = `http://127.0.0.1:${port}`;
+test('approves, pairs, reconnects, and isolates two camera sessions', { timeout: 30_000 }, async t => {
+  const server = await startTestServer(t);
+  const { base } = server;
+  const options = { method: 'POST', headers: { 'X-PhoneCam-Client': 'viewer' } };
   const sockets = [];
   try {
-    let ready = false;
-    for (let i = 0; i < 40; i++) {
-      try { const health = await (await fetch(`${base}/health`)).json(); ready = health.ok && health.app === 'phonecam'; if (ready) break; } catch {}
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    assert.equal(ready, true, 'server started');
-    const roomResponse = await fetch(`${base}/api/room`, { method: 'POST' });
+    const roomResponse = await fetch(`${base}/api/room`, options);
     assert.equal(roomResponse.status, 201);
-    const { code } = await roomResponse.json();
+    const { code, viewerToken } = await roomResponse.json();
     assert.match(code, /^[A-HJ-NP-Z2-9]{6}$/);
-    const viewer = new WebSocket(`ws://127.0.0.1:${port}/signal`);
+    const viewer = new WebSocket(server.ws);
     sockets.push(viewer);
     const nextViewer = messages(viewer);
     await once(viewer, 'open');
-    viewer.send(JSON.stringify({ type: 'join', role: 'viewer', code }));
+    viewer.send(JSON.stringify({ type: 'join', role: 'viewer', code, viewerToken }));
     assert.equal((await nextViewer()).type, 'joined');
-    const phone = new WebSocket(`ws://127.0.0.1:${port}/signal`);
+    const phone = new WebSocket(server.wss, { ca: server.ca });
     sockets.push(phone);
     const nextPhone = messages(phone);
     await once(phone, 'open');
     phone.send(JSON.stringify({ type: 'join', role: 'phone', code }));
     assert.equal((await nextPhone()).type, 'joined');
+    assert.equal((await nextViewer()).type, 'pair-request');
+    viewer.send(JSON.stringify({ type: 'pair-decision', approve: true }));
     assert.equal((await nextViewer()).type, 'paired');
     assert.equal((await nextPhone()).type, 'paired');
     const offer = { type: 'offer', sdp: { type: 'offer', sdp: 'test' } };
@@ -80,29 +62,31 @@ test('pairs two peers and relays signaling', async () => {
     viewer.close();
     await once(viewer, 'close');
     assert.equal((await nextPhone()).type, 'peer-left');
-    const returningViewer = new WebSocket(`ws://127.0.0.1:${port}/signal`);
+    const returningViewer = new WebSocket(server.ws);
     sockets.push(returningViewer);
     const nextReturningViewer = messages(returningViewer);
     await once(returningViewer, 'open');
-    returningViewer.send(JSON.stringify({ type: 'join', role: 'viewer', code }));
+    returningViewer.send(JSON.stringify({ type: 'join', role: 'viewer', code, viewerToken }));
     assert.equal((await nextReturningViewer()).type, 'joined');
     assert.equal((await nextReturningViewer()).type, 'paired');
     assert.equal((await nextPhone()).type, 'paired');
-    const secondRoom = await fetch(`${base}/api/room`, { method: 'POST' });
-    const { code: secondCode } = await secondRoom.json();
+    const secondRoom = await fetch(`${base}/api/room`, options);
+    const { code: secondCode, viewerToken: secondToken } = await secondRoom.json();
     assert.notEqual(secondCode, code);
-    const secondViewer = new WebSocket(`ws://127.0.0.1:${port}/signal`);
+    const secondViewer = new WebSocket(server.ws);
     sockets.push(secondViewer);
     const nextSecondViewer = messages(secondViewer);
     await once(secondViewer, 'open');
-    secondViewer.send(JSON.stringify({ type: 'join', role: 'viewer', code: secondCode }));
+    secondViewer.send(JSON.stringify({ type: 'join', role: 'viewer', code: secondCode, viewerToken: secondToken }));
     assert.equal((await nextSecondViewer()).type, 'joined');
-    const secondPhone = new WebSocket(`ws://127.0.0.1:${port}/signal`);
+    const secondPhone = new WebSocket(server.wss, { ca: server.ca });
     sockets.push(secondPhone);
     const nextSecondPhone = messages(secondPhone);
     await once(secondPhone, 'open');
     secondPhone.send(JSON.stringify({ type: 'join', role: 'phone', code: secondCode }));
     assert.equal((await nextSecondPhone()).type, 'joined');
+    assert.equal((await nextSecondViewer()).type, 'pair-request');
+    secondViewer.send(JSON.stringify({ type: 'pair-decision', approve: true }));
     assert.equal((await nextSecondViewer()).type, 'paired');
     assert.equal((await nextSecondPhone()).type, 'paired');
     secondPhone.send(JSON.stringify({ type: 'offer', sdp: { type: 'offer', sdp: 'second-room' } }));
@@ -120,6 +104,5 @@ test('pairs two peers and relays signaling', async () => {
     }
   } finally {
     for (const socket of sockets) socket.terminate();
-    await new Promise(resolve => { child.once('exit', resolve); child.kill(); });
   }
 });

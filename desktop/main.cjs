@@ -3,6 +3,7 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 const { openFrameStore, PIXEL_BYTES } = require('./frame-store.cjs');
+const { viewerWindowOptions } = require('./window-options.cjs');
 
 const baseUrl = 'http://127.0.0.1:8080';
 let serverProcess = null;
@@ -64,7 +65,7 @@ async function serverIsReady() {
     const response = await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(700) });
     if (!response.ok) return false;
     const data = await response.json();
-    return data.app === 'phonecam';
+    return data.app === 'phonecam' && data.protocol === 2;
   } catch { return false; }
 }
 
@@ -83,26 +84,14 @@ async function ensureServer() {
     if (serverProcess.exitCode !== null) break;
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  throw new Error('PhoneCam could not start its local connection server. Check whether port 8080 is already in use.');
+  throw new Error('PhoneCam could not start its local connection server. Close older PhoneCam apps and development servers using port 8080, then reopen PhoneCam.');
 }
 
 async function createWindow() {
   await ensureServer();
   openFrameFile();
   ipcMain.handle('phonecam-gpu-status', () => gpuInfoReady ? app.getGPUFeatureStatus().video_decode : 'checking');
-  mainWindow = new BrowserWindow({
-    width: 1060,
-    height: 850,
-    minWidth: 700,
-    minHeight: 580,
-    title: 'PhoneCam',
-    backgroundColor: '#091519',
-    autoHideMenuBar: true,
-    // The virtual camera is fed by this page's animation loop. Keep it running
-    // while a call app is in front or the PhoneCam window is minimized.
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true,
-      backgroundThrottling: false, preload: path.join(__dirname, 'preload.cjs') }
-  });
+  mainWindow = new BrowserWindow(viewerWindowOptions());
   ipcMain.on('phonecam-always-on-top', (event, enabled) => {
     if (event.sender === mainWindow?.webContents) mainWindow.setAlwaysOnTop(Boolean(enabled));
   });
@@ -133,9 +122,14 @@ async function createWindow() {
   })) globalShortcut.register(key, () => mainWindow?.webContents.send('phonecam-shortcut', action));
 }
 
-app.whenReady().then(createWindow).catch(error => {
+if (!app.requestSingleInstanceLock()) app.quit();
+else app.whenReady().then(createWindow).catch(error => {
   dialog.showErrorBox('PhoneCam could not start', error.message);
   app.quit();
+});
+app.on('second-instance', () => {
+  if (mainWindow?.isMinimized()) mainWindow.restore();
+  mainWindow?.focus();
 });
 
 app.on('window-all-closed', () => app.quit());

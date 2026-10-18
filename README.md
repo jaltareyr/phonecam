@@ -1,88 +1,188 @@
-# PhoneCam
+# PhoneCam — Open-source Android webcam for Windows
 
-An independent Android-to-Windows camera app in development. The Android phone captures video and optional microphone audio in its browser; WebRTC sends it directly to a Windows desktop app. The local server handles pairing and signaling. The Windows 11 installer registers a native virtual camera. Windows registration and frame capture were verified on the development PC on October 17, 2026; a live phone feed in Zoom and Google Meet still needs a final device test.
+[![CI](https://github.com/jaltareyr/phonecam/actions/workflows/ci.yml/badge.svg)](https://github.com/jaltareyr/phonecam/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Status: alpha](https://img.shields.io/badge/status-alpha-orange.svg)](docs/TESTING.md)
+[![Windows 11 x64](https://img.shields.io/badge/desktop-Windows%2011%20x64-0078D4.svg)](docs/GETTING_STARTED.md)
 
-## Start
+**Use your Android phone as a Windows webcam over Wi-Fi or USB.** PhoneCam
+streams camera video directly across your local network using WebRTC, shows
+a live Windows preview, and includes a native Windows virtual camera.
 
-The local server runs with Node.js 20+. Desktop development and packaging require Node.js 22.12+; this computer uses the available Node 24 runtime. The packaged Windows app includes its own runtime. REA's separate CLI requires Node.js 22.19+ or 24.11+.
+The phone runs the camera page in Chrome. No Android APK is required. The
+desktop app is built with Electron, JavaScript, and a C++ Media Foundation
+camera source. The project welcomes bug reports, device tests, and pull requests.
 
-```powershell
-npm install
-npm start
-```
+> **Public alpha:** phone-to-PC video has worked on the development Android/Windows
+> setup. Zoom and Google Meet compatibility fixes are implemented but still need
+> live device verification. Long-call reliability and installation on a second PC
+> remain unverified. Downloads are unsigned. See the [test matrix](docs/TESTING.md)
+> before relying on PhoneCam for a call.
 
-On the PC, open `http://localhost:8080/viewer` and note the pairing code. Add camera creates a separate code for each phone. The HTTP listener binds only to this PC's loopback interface.
+**[Download alpha builds](https://github.com/jaltareyr/phonecam/releases)** ·
+**[Connect your phone](docs/GETTING_STARTED.md)** ·
+**[Contribute](CONTRIBUTING.md)** ·
+**[Report a bug](https://github.com/jaltareyr/phonecam/issues/new/choose)**
 
-## Windows desktop app
+Desktop and phone views below use a synthetic test feed; no personal camera footage is shown.
 
-Run [PhoneCam.exe](release/PhoneCam-win32-x64/PhoneCam.exe) from its release folder for development. It opens a native Windows window and starts the local server if needed. Keep the release folder intact; the executable uses files beside it. The [portable EXE](release/portable/PhoneCam-Portable-0.6.0-x64.exe) is a single-file way to run the desktop preview without installing it. It does not register the virtual camera. For camera selection in Zoom or other Windows apps on another Windows 11 x64 PC (build 22000 or later), use [PhoneCam Setup](release/installer/PhoneCam-Setup-0.6.0-x64.exe). Setup requests administrator access, installs to Program Files, creates a writable frame directory in ProgramData, and registers the camera for all Windows users. Uninstall removes the camera registration before deleting its files. To rebuild from source with Node 22.12+ on `PATH`:
+![PhoneCam Windows desktop preview with synthetic local camera video](docs/images/desktop-preview.png)
 
-```powershell
-npm ci
-npm run installer:win
-npm run portable:win
-```
+<img src="docs/images/phone-preview.png" width="260" alt="PhoneCam Android browser camera preview with Start/Stop, Flip, and settings controls">
 
-On this computer, Node 24 is available at `C:\Users\Yashodhan Jaltare\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe`. Building the installer also requires Inno Setup 6 and Visual Studio C++ Build Tools for the native camera binaries. Build the portable EXE after `npm run installer:win` or `npm run package:win`; it wraps the already packaged app. The source development command is `npm run desktop` when the Node runtime is on `PATH`.
+## What works today
 
-### Android via USB
+- Android camera streaming over local Wi-Fi, with QR pairing and HTTPS.
+- USB streaming through Android Debug Bridge (`adb reverse`).
+- A Windows desktop preview and a native **1280 × 720 at 30 fps** virtual camera.
+- A large phone preview with settings, Start/Stop, and front/rear camera switching.
+- Phone resolution requests from 480p to 4K; actual modes depend on the device.
+- Rotation, mirroring, color adjustments, whole-frame effects, and image overlays.
+- Snapshots, video recording, a separate feed window, and feed-only fullscreen.
+- Camera controls such as zoom, focus, exposure, and flashlight where Android Chrome exposes them.
+- Desktop approval for new phone connections and automatic signaling reconnection.
 
-With Android USB debugging enabled and Android SDK platform-tools installed:
+The phone's **Actual** and **Sending** lines report capture and encoded video
+dimensions. A 4K phone capture does **not** make the current Windows virtual
+camera output 4K; that output is fixed at 720p/30.
 
-```powershell
-adb devices
-adb reverse tcp:8080 tcp:8080
-```
+## Install and connect
 
-On the phone, open `http://localhost:8080/phone` in Chrome. Enter the code, choose a camera, and allow access. Chrome treats `localhost` as a secure context for camera capture. The USB link uses ADB forwarding; video does not require iVCam's phone app.
+You need **Windows 11 x64, build 22000 or later**, an Android phone with Chrome,
+and either the same trusted local network or a USB connection with ADB.
 
-The phone page opens into a full-screen camera preview. Its settings button opens pairing, camera, resolution, frame rate, and microphone options; the Controls button opens live zoom, focus, exposure, and flashlight controls when supported. The selected resolution, frame rate, and microphone preference are remembered on the phone. Choose the requested resolution and frame rate before pressing **Start camera**. The phone tries exact landscape and portrait camera modes, then the nearest supported mode; its **Actual** line shows the granted camera mode. The **Sending** line and Windows settings show encoded and received dimensions, frame rate, codec, and bitrate. If a high-resolution encoder produces no frames, the phone retries at 1080p and reports that change. **Switch camera** in the Windows app changes front/rear camera in the existing connection where Android supports both; use the phone's camera selector and **Start camera** to choose a specific lens or change quality. Enable **Send phone microphone** to include audio, then press **Unmute** in the Windows app to hear it.
+1. Download `PhoneCam-Setup-<version>-x64.exe` from
+   [Releases](https://github.com/jaltareyr/phonecam/releases), compare its SHA-256
+   with `SHA256SUMS.txt`, and run the installer. Administrator approval registers
+   the Windows camera. Unsigned alpha builds may show a Windows publisher warning.
+2. Open PhoneCam. Click the connection indicator at the bottom left and select **Wi-Fi**.
+3. On first Wi-Fi setup, install **this PC's generated local CA certificate** on
+   Android as described in the [connection guide](docs/GETTING_STARTED.md#wifi).
+   Chrome needs a trusted connection to use the camera. Scan the QR code and
+   allow camera permission on the phone.
+4. Tap **Start** on the phone, then **Accept phone** in the Windows app. Approve
+   only a connection you initiated. The preview should appear on the PC.
+5. Keep PhoneCam open and select **PhoneCam** in your camera application's device
+   selector. Call-app compatibility is still being validated.
 
-If Android reports that it could not start the camera source, PhoneCam 0.3.1 retries at 480p/15 fps with the selected and alternate lenses. On the tested Samsung phone, Android's camera service showed that another Chrome tab already held the camera; force stopping Chrome and reopening one PhoneCam tab resolved it. If all attempts fail, check Android's Camera access toggle and Chrome camera permission, close camera tabs, then restart Chrome. This error occurs before pairing or Zoom receives video.
+The **portable EXE** runs the preview without installing the app. It does not
+register or update the virtual camera. Use the installer for Windows camera
+integration. USB setup is documented in the [connection guide](docs/GETTING_STARTED.md#usb).
 
-### Android via Wi-Fi
+## Current limits
 
-In the Windows app, click the connection status at the bottom left to open the pairing dialog, then choose **Wi-Fi**. It shows this PC's LAN address and a **Copy address** button that includes the pairing code. Both devices must be on the same network. On first launch, PhoneCam generates a distinct local CA and server certificate in `%LOCALAPPDATA%\PhoneCam\certs`; no private key is included in the installer. It renews the server certificate when a new Wi-Fi IP appears. For standalone development, certificates are generated in the ignored `certs/` folder. The old Python generator remains available for manual testing:
-
-```powershell
-python -m pip install cryptography
-python scripts/make_cert.py --ip 192.168.1.10
-npm start
-```
-
-Use the actual address shown in the Windows app in place of the example IP, or scan its pairing QR code. Open the address in Android Chrome and start the camera. The PC advertises `_phonecam._tcp.local` for future native clients; Android Chrome cannot browse that service directly, so the QR code or address is still needed. Android must trust the local certificate authority for camera access; simply bypassing a certificate warning may leave Chrome without a secure context. The Wi-Fi panel links to the CA certificate, and the phone page shows the same download if camera access is blocked. Install it using Android's **Install a CA certificate** setting, then reopen the phone page. Only install the certificate generated on your own PC. The CA private key stays in local app data and is never packaged. Uninstall leaves each user's certificate files in local app data; the user may delete that folder after removing the CA trust on Android.
-
-## Architecture
-
-`phone browser camera and optional microphone -> WebRTC -> Windows app preview`
-
-`server.js` creates short-lived pairing rooms and relays WebRTC signaling only. It does not relay video or store frames. A six-character room code keeps casual cross-connections apart; this is a local prototype, not an internet-facing authentication system.
-
-## REA evidence
-
-REA 6.5.0 inspected the installed `C:\Program Files\e2eSoft\iVCam\iVCam.exe`. Its SHA-256 is `dafee92aced49c8bdce4f334486170e59fcf03a52b00fcef57071ba4d15ea0f6`. REA classified it as a native x86-64 PE with no .NET CLI directory. The shipped iVCam installation also contains separate camera and microphone driver packages, video libraries, and ADB binaries. These observations guide component boundaries; PhoneCam uses its own implementation and protocol.
-
-Native function analysis needs Ghidra 12.1.x and a compatible JDK. Those are not configured on this computer yet. REA is installed for this project under `tools/rea/`; use the Node 24 runtime and `tools/rea/node_modules/rea-agents/scripts/rea.mjs` to run its CLI.
-
-## Feature status
-
-| Feature | Current state |
+| Area | Status |
 | --- | --- |
-| Android video over USB | Working on a connected Android phone with ADB reverse forwarding. |
-| Wi-Fi video | Confirmed on the connected Android phone: HTTPS pairing and WebRTC delivered live video to the Windows preview. Android must trust the local certificate. Long-call stability remains untested. |
-| Resolution and frame rate | Requests 480p through 4K and 15 through 240 fps. Actual values depend on camera, browser, USB or Wi-Fi bandwidth, and WebRTC encoding. The phone shows the granted settings. |
-| Camera controls | Front/rear switching from the PC; lens selection, zoom and tap focus from the PC when exposed, and conditional focus, exposure, and flashlight controls on the phone. Browser support varies by phone. |
-| Phone microphone | Optional WebRTC audio track and Windows playback; device validation pending. |
-| Multi-camera | Separate simultaneous pairing rooms and Windows previews; second physical phone validation pending. |
-| Effects and orientation | Mirror, 90° rotation, monochrome, warm color, soft focus, mosaic, brightness, contrast, saturation, hue, and an image overlay. Snapshots, virtual-camera frames, and processed recordings include them. Effects are rendered at up to 1920 pixels on the longest side to avoid a full 4K canvas redraw on every frame; unprocessed preview and snapshots retain the received stream resolution. AI person segmentation, background replacement, and face retouching are pending. |
-| Capture | PNG snapshots and WebM/MP4 recording through the browser's MediaRecorder, with discard control. Unprocessed recording keeps the incoming stream's frame rate; processed recording is captured at 30 fps. |
-| Windows controls | Video-first window with bottom snapshot, record, settings, and options controls. The menu opens a separate feed window, feed-only fullscreen, and always-on-top in Electron. Browser mode opens a feed tab. Selected-camera shortcuts Ctrl+S/R/P/N/Q and global shortcuts Ctrl+Alt+S/R/P/N/Q remain available. |
-| Reconnection | Phone and viewer retry signaling after transport loss; physical-phone interruption and recovery still need validation. |
-| Virtual webcam and microphone devices | The installer registers a native 720p PhoneCam camera and removes it on uninstall; the live frame bridge uses `%ProgramData%\PhoneCam\frame.bin`. Windows enumerated the installed camera, and a Media Foundation capture test received nonblack 1280×720 NV12 frames from the live Android feed. Version 0.6.0 keeps the Electron frame producer active when the window is behind a call app or minimized, and accepts bottom-up RGB camera buffers. A live Zoom/Meet preview on 0.6.0 still needs device validation. A Windows virtual microphone is pending. |
+| Android-to-Windows Wi-Fi and USB preview | Verified on the development setup |
+| Windows virtual camera | Registered and captured through Media Foundation on the development PC |
+| Zoom, Meet, Teams, and OBS | End-to-end compatibility testing still needed |
+| 30-minute calls, reconnects, and second-PC installation | Validation still needed |
+| Windows camera output | One device, fixed 720p/30; NV12 and RGB32 |
+| Phone microphone | Optional audio stream and desktop playback; no selectable Windows virtual microphone |
+| Multiple phones | Separate pairing rooms and previews; one selected Windows camera output |
+| AI background removal and replacement | Planned; current blur/mosaic affect the whole frame |
+| Native Android and iOS apps | Planned; current supported phone path is Android Chrome |
+| Automatic discovery | PC advertises mDNS; browser pairing uses QR/code |
 
-## Next milestones
+See the [roadmap](docs/ROADMAP.md) for priorities. Features described as planned
+are not included in the alpha.
 
-1. Validate the live feed in Windows Camera and Zoom after signing in to Zoom.
-2. Add AI background segmentation and replacement.
-3. Validate phone audio, multiple physical phones, Wi-Fi pairing, and higher resolutions on devices that support them.
-4. Add virtual microphone support and finish device-level reconnect validation.
+## Run from source
+
+Install **Node.js 22.12 or later**; Node 24 LTS is recommended.
+
+```sh
+git clone https://github.com/jaltareyr/phonecam.git
+cd phonecam
+npm ci
+npm start
+```
+
+Open `http://localhost:8080/viewer` on the PC. The server starts a loopback-only
+HTTP listener on port 8080 and a LAN HTTPS listener on port 8443. Certificates
+are generated locally into the ignored `certs/` directory.
+
+For the Electron desktop preview:
+
+```sh
+npm run desktop
+```
+
+Browser preview development does not install a Windows camera. Building the
+installer also needs Visual Studio C++ Build Tools, a Windows SDK, and Inno
+Setup. See [development and builds](docs/DEVELOPMENT.md).
+
+## How video gets to Windows
+
+```mermaid
+flowchart LR
+    Phone[Android Chrome camera] -->|WebRTC on the LAN| Desktop[Windows desktop preview]
+    Phone -. pairing and signaling .-> Server[Local PhoneCam server]
+    Desktop -. pairing and signaling .-> Server
+    Desktop -->|selected processed frame| Frame[Local frame bridge]
+    Frame --> Camera[Windows virtual camera]
+    Camera --> Apps[Camera consumers]
+```
+
+WebRTC negotiates the actual codec; PhoneCam currently prefers H.264 when
+available. The local server handles pairing and signaling, not media relay.
+There is no PhoneCam cloud account or hosted media service. Recording saves
+files only when the user starts a recording or snapshot.
+
+## Help build PhoneCam
+
+**Pull requests are welcome.** You can contribute without owning every test
+device: improve documentation, fix reproducible bugs, report device results,
+or work on an issue marked `good first issue` or `help wanted`.
+
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [community guidelines](CODE_OF_CONDUCT.md).
+2. For a large change, open an issue describing the problem and approach.
+3. Fork the repository, make a focused branch, and run:
+
+   ```sh
+   npm run check
+   npm test
+   ```
+
+4. Open a pull request describing the behavior, tests, and device limitations.
+
+Useful areas include camera-consumer compatibility, Windows installation tests,
+Android camera controls, reconnection, accessibility, and native mobile clients.
+For security issues, use [private vulnerability reporting](SECURITY.md), not a
+public issue containing exploit details or private video.
+
+## Frequently asked questions
+
+**Is PhoneCam an open-source alternative to iVCam?**
+It aims to cover the phone-as-webcam use case with independent code, assets,
+and protocol. It is not affiliated with E2ESOFT and does not yet have iVCam's
+feature coverage or reliability validation.
+
+**Can I use my phone as a webcam without installing an Android app?**
+Yes. The current phone client runs in Android Chrome. Wi-Fi requires trusting
+the certificate generated by your own PC; USB uses ADB reverse forwarding.
+
+**Does the camera feed leave my local network?**
+PhoneCam configures peer connections without external STUN or TURN servers.
+Camera media flows between the phone and PC. Keep this alpha on trusted networks
+and do not expose its listener through router port forwarding.
+
+**Why can I select 4K but get a 720p webcam?**
+Capture, transport, desktop preview, and virtual-camera output are separate
+stages. Higher phone capture modes can be requested, but the current Windows
+camera source outputs 1280 × 720 at 30 fps.
+
+**Why is the video dark in a call app?**
+First confirm that the PhoneCam desktop preview has live video and the call app
+selected PhoneCam. Install the newest alpha and restart the camera consumer
+after upgrading. Background frame scheduling, native write-contention, and RGB-stride fixes are included, but
+call-app compatibility still needs verification. Please submit a
+[device test report](https://github.com/jaltareyr/phonecam/issues/new/choose)
+with Windows/app versions and logs that contain no private media or pairing codes.
+
+## License and credits
+
+PhoneCam is released under the [MIT license](LICENSE). The native camera source
+derives from Microsoft's Windows-Camera sample. See
+[third-party notices](THIRD_PARTY_NOTICES.md) for attribution and distribution
+requirements. [Changelog](CHANGELOG.md) · [Security model](docs/SECURITY_MODEL.md)

@@ -210,9 +210,10 @@ namespace winrt::WindowsSample::implementation
             &bufferLength));
 
 
-        RETURN_IF_FAILED(m_spFrameGenerator->CreateFrame(pbuf, bufferLength, pitch, m_rgbMask));
+        const HRESULT frameResult = m_spFrameGenerator->CreateFrame(pbuf, bufferLength, pitch, m_rgbMask);
         //RETURN_IF_FAILED(WriteSampleData(pbuf, bufferLength, pitch, NUM_IMAGE_COLS, NUM_IMAGE_ROWS));
         RETURN_IF_FAILED(buffer2D->Unlock2D());
+        RETURN_IF_FAILED(frameResult);
 
         RETURN_IF_FAILED(sample->SetSampleTime(MFGetSystemTime()));
         RETURN_IF_FAILED(sample->SetSampleDuration(333333));

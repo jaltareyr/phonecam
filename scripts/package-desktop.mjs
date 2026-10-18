@@ -6,7 +6,7 @@ import { packager } from '@electron/packager';
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const out = path.join(root, 'release');
 const packageInfo = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const foldersToSkip = ['.git', 'tools', 'certs', 'release', 'test', 'native'];
+const foldersToSkip = ['.git', '.github', 'tools', 'certs', 'release', 'test', 'support', 'native'];
 const ignore = foldersToSkip.map(folder => new RegExp(`^[/\\\\]${folder.replace('.', '\\.')}([/\\\\]|$)`));
 ignore.push(/^[/\\\\]node_modules[/\\\\]@electron[/\\\\]packager([/\\\\]|$)/);
 const outputs = await packager({

@@ -1,0 +1,54 @@
+name: Build alpha release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing alpha tag to build (for example v0.7.0-alpha.1)
+        required: true
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:desktop
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - run: npm run installer:win
+      - run: npm run portable:win
+      - name: Collect artifacts and SHA-256 manifest
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release/distribution -Force | Out-Null
+          Copy-Item release/installer/PhoneCam-Setup-*.exe release/distribution/
+          Copy-Item release/portable/PhoneCam-Portable-*.exe release/distribution/
+          Get-ChildItem release/distribution/*.exe | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          } | Set-Content release/distribution/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-alpha
+          path: release/distribution/*
+      - name: Publish prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release create $env:RELEASE_TAG release/distribution/* --verify-tag --prerelease --title "PhoneCam $env:RELEASE_TAG (alpha)" --notes-file docs/RELEASE_NOTES.md

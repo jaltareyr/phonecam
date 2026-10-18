@@ -1,6 +1,14 @@
 {
   "name": "phonecam",
-  "version": "0.6.0",
+  "version": "0.7.0",
+  "description": "Open-source Android webcam for Windows with local WebRTC video over Wi-Fi or USB.",
+  "license": "MIT",
+  "author": "Yashodhan Jaltare",
+  "repository": { "type": "git", "url": "https://github.com/jaltareyr/phonecam.git" },
+  "homepage": "https://github.com/jaltareyr/phonecam#readme",
+  "bugs": { "url": "https://github.com/jaltareyr/phonecam/issues" },
+  "keywords": ["android", "webcam", "windows", "webrtc", "virtual-camera", "wifi", "usb", "open-source"],
+  "engines": { "node": ">=22.12.0" },
   "private": true,
   "type": "module",
   "main": "desktop/main.cjs",
@@ -10,7 +18,9 @@
     "package:win": "node scripts/package-desktop.mjs",
     "portable:win": "node scripts/build-portable.mjs",
     "installer:win": "node scripts/build-installer.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "check": "node scripts/check-syntax.mjs",
+    "test:desktop": "node scripts/desktop-smoke.mjs"
   },
   "dependencies": {
     "@peculiar/x509": "^2.2.0",
